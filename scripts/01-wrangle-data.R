@@ -16,4 +16,4 @@ rwc <- read_sheet("https://docs.google.com/spreadsheets/d/1R2auYuNOX0z3-01NkyFAt
 
 # Quick plot to check relationship
 ggplot(rwc, aes(x = RWC, y = wp_mpa)) +
-  geom_point(aes(col = trt))
+  geom_point(aes(col = period))
