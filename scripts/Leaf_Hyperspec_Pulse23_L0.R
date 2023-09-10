@@ -30,7 +30,7 @@ calc_VI <- function(df, a, b, c, d){
 folders=c('08_14','08_15','08_16','08_18','08_21','08_22','08_23','08_26','08_30','09_04')
 dates=c('8/14/23','8/15/23','8/16/23','8/18/23','8/21/23','8/22/23','8/23/23','8/26/23','8/30/23','9/4/23')
 merge=c()
-master <- read.csv2(paste(data_dir,'/data/Datasheet/RainMan_Pulse23_Spectra_090723.csv',sep=''),sep=',',header=T)
+master <- read.csv2(paste(github_dir,'/data/Datasheet/RainMan_Pulse23_Spectra_090723.csv',sep=''),sep=',',header=T)
 master$REP1<-str_pad(master$REP1, 5, pad = "0")
 master$REP2<-str_pad(master$REP2, 5, pad = "0")
 for(i in 1:length(dates)){
@@ -50,7 +50,7 @@ for(i in 1:length(dates)){
   rwc_id=c()
   
   for(j in 1:length(daily_master$REP1)){
-    file_list[j] <- list.files(paste(data_dir,'/data/Data_Level0/',folders[i],'/',sep=''), full.names = T, pattern = paste(daily_master$REP1[j],".asd",sep=''))
+    file_list[j] <- list.files(paste(github_dir,'/data/Data_Level0/',folders[i],'/',sep=''), full.names = T, pattern = paste(daily_master$REP1[j],".asd",sep=''))
     scan_id[j] <- sub(".*/", "", file_list[j])
     date_id[j]=daily_master$DATE[j]
     time_id[j]=daily_master$TIME[j]
@@ -102,7 +102,7 @@ for(i in 1:length(dates)){
     theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1)) +
     theme(text = element_text(size = 40)) +
     theme_bw()
-  ggsave(paste(data_dir,'/figures/Hyperspectral_Reflectance_Rep1_',folders[i],'.png',sep=''),dpi=300,width=180,height=120,units='mm')
+  ggsave(paste(github_dir,'/figures/Hyperspectral_Reflectance_Rep1_',folders[i],'.png',sep=''),dpi=300,width=180,height=120,units='mm')
   
   ####################################################################################################
   #VIs - Convert to wide format
@@ -130,12 +130,12 @@ for(i in 1:length(dates)){
              df_wide$NDVI,df_wide$CI1,df_wide$CI2,df_wide$NDWI1,df_wide$NDWI2,df_wide$NDWI3,df_wide$WI1,df_wide$WI2,df_wide$WI3,df_wide$PRI,wp_id,rwc_id)
   colnames(out)<-c("Date",'ID','House','Plot','Treat','Winter','Summer','Time',
                    'NDVI','CI1','CI2','NDWI1','NDWI2','NDWI3','WI1','WI2','WI3','PRI','WP','RWC')
-  write.csv(out,paste(data_dir,'/data/Data_Level1/Indices_Rep1_',folders[i],".csv",sep=''),row.names=FALSE,col.names=TRUE)
+  write.csv(out,paste(github_dir,'/data/Data_Level1/Indices_Rep1_',folders[i],".csv",sep=''),row.names=FALSE,col.names=TRUE)
   print(dates[i])
   print(dim(out))
   merge<-rbind(merge,out)
 }
 colnames(out)<-c("Date",'ID','House','Plot','Treat','Winter','Summer','Time',
                  'NDVI','CI1','CI2','NDWI1','NDWI2','NDWI3','WI1','WI2','WI3','PRI','WP','RWC')
-write.csv(merge,paste(data_dir,'/data/Data_Level1/Indices_Rep1_Merged.csv',sep=''),row.names=FALSE,col.names=TRUE)
+write.csv(merge,paste(github_dir,'/data/Data_Level1/Indices_Rep1_Merged.csv',sep=''),row.names=FALSE,col.names=TRUE)
 
