@@ -68,13 +68,14 @@ for(i in 1:length(dates)){
   dataset <- data.frame()
   for (j in 1:length(file_list)){
     md<-get_metadata(file_list[j])
-    temp_data<-get_spectra(file_list[j])
+    temp_data<-get_spectra(file_list[j]) #read in hyperspectral data using 'asdreader' package.
     data<-as.numeric(temp_data)
     wvl=as.integer(colnames(temp_data))
-    c1=data[which(wvl==1000)]-data[which(wvl==1001)]
-    c2=data[which(wvl==1800)]-data[which(wvl==1801)]
-    data_c=c(data[1:which(wvl==1000)],data[which(wvl==1001):which(wvl==1800)]+c1,data[which(wvl==1801):which(wvl==2500)]+c1+c2)
-    data_s=data_c/sqrt(sum(data_c^2))
+    #########Spectra Processing following Schweiger et al. Nature Ecology and Evolution (2018)################
+    c1=data[which(wvl==1000)]-data[which(wvl==1001)] #breakpoint #1 that seperates spectrometer 1 from spectrometer 2 (correction for any discontinuinty)
+    c2=data[which(wvl==1800)]-data[which(wvl==1801)] #breakpoint #2 that seperates spectrometer 2 from spectrometer 3 (correction for any discontinuinty)
+    data_c=c(data[1:which(wvl==1000)],data[which(wvl==1001):which(wvl==1800)]+c1,data[which(wvl==1801):which(wvl==2500)]+c1+c2) #corrected raw reflectance data
+    data_s=data_c/sqrt(sum(data_c^2)) #data standardization step (see Schweiger et al. 2018)
     date=rep(date_id[j],length(wvl))
     time=rep(time_id[j],length(wvl))
     house=rep(house_id[j],length(wvl))
@@ -110,12 +111,12 @@ for(i in 1:length(dates)){
     pivot_wider(names_from = wavelength, values_from = reflectance, id_cols = full, values_fn = mean)
   
   #NDVI
-  df_wide$NDVI <- calc_VI(df_wide, 850, 850, 650, 650)
+  df_wide$NDVI <- calc_VI(df_wide, 850, 850, 650, 650) #literature derived chlorophyll proxies
   df_wide$CI1 <- calc_VI(df_wide, 750, 750, 550, 550)
   df_wide$CI2 <- calc_VI(df_wide, 750, 750, 710, 710)
   
   #NDWI
-  df_wide$WI1 <- calc_SR(df_wide, 900, 900, 970, 970)
+  df_wide$WI1 <- calc_SR(df_wide, 900, 900, 970, 970) #literature derived water content proxies
   df_wide$WI2 <- calc_SR(df_wide, 1600, 1600, 820, 820)
   df_wide$WI3 <- calc_SR(df_wide, 860, 860, 1240, 1240)
   df_wide$NDWI1 <- calc_VI(df_wide, 860, 860, 1240, 1240)
@@ -123,7 +124,7 @@ for(i in 1:length(dates)){
   df_wide$NDWI3 <- calc_VI(df_wide, 860, 860, 2130, 2130)
   
   #PRI
-  df_wide$PRI <- calc_VI(df_wide, 530, 530, 570, 570) 
+  df_wide$PRI <- calc_VI(df_wide, 530, 530, 570, 570) #literature derived pri bands
   
   #write csv file
   out<-cbind(date_id,df_wide$full,house_id,plot_id,treat_id,winter_id,summer_id,time_id,
