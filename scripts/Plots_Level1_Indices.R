@@ -203,6 +203,20 @@ ggplot(data, aes(x=NDVI, y=RWC,color=Time)) +
   theme(text = element_text(size = 10))
 ggsave(paste(github_dir,'/figures/',"Scatterplot_RWC_NDVI.png",sep=""),dpi=300,width=180,height=120,units='mm')
 
+ggplot(data, aes(x=NDVI, y=WI1,color=Time)) +
+  geom_point(size=3)+
+  facet_wrap(~Summer)+
+  geom_smooth(method=lm,aes(group = Time))+
+  stat_cor(aes(group = Time,label = after_stat(rr.label)),geom = "label",label.y.npc="bottom", label.x.npc = "right",hjust=1)+
+  #geom_smooth(method=lm,formula=y ~ poly(x, 2, raw=TRUE),color='black',fill=NA)+
+  #stat_cor(aes(label = after_stat(rr.label)),geom = "label",color='black',label.y.npc="bottom", label.x.npc = "right",hjust=1)+
+  labs(x='NDVI',y='WI')+
+  theme_bw()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1)) +
+  theme(text = element_text(size = 10))
+ggsave(paste(github_dir,'/figures/',"Scatterplot_WI1_NDVI.png",sep=""),dpi=300,width=180,height=120,units='mm')
+
+
 ggplot(data, aes(x=CI1, y=RWC,color=Time)) +
   geom_point(size=3)+
   facet_wrap(~Summer)+
