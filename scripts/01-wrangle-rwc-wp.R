@@ -302,3 +302,5 @@ wp_wide_out |>
 write_csv(wp_rwc_out, "data_clean/wp_rwc.csv")
 
 write_csv(wp_wide_out, "data_clean/wp_wide.csv")
+
+write_csv(irig_long, "data_clean/irig_long.csv")
