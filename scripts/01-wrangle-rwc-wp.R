@@ -285,3 +285,20 @@ wp_rwc_out |>
   facet_grid(cols = vars(trt_s),
              rows = vars(period))
    
+
+wp_wide_out <- wp_wide2 |> 
+  left_join(pulse_days, by = join_by("date_col" == "date", "trt_s")) |> 
+  left_join(pulse_num, by = join_by("date_col" == "date", "trt_s"))
+
+
+wp_wide_out |> 
+  ggplot(aes(x = predawn, y = midday)) +
+  geom_point(aes(color = as.factor(days_since_pulse))) +
+  geom_abline(slope = 1, intercept = 0, lty = 2) +
+  facet_grid(cols = vars(trt_s),
+             rows = vars(pulse_num))
+
+# Write out to data_clean/
+write_csv(wp_rwc_out, "data_clean/wp_rwc.csv")
+
+write_csv(wp_wide_out, "data_clean/wp_wide.csv")
