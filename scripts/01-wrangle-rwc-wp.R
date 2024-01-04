@@ -229,6 +229,30 @@ wp_wide2 |>
 irig <- read_csv("data/irrig.csv",
                  locale = locale(tz = "America/Phoenix"))
 
+# label pulse number
+temp <- data.frame(S1 = numeric(nrow(irig)),
+                   S2 = numeric(nrow(irig)),
+                   S3 = numeric(nrow(irig)),
+                   S4 = numeric(nrow(irig)))
+for(i in 1:nrow(irig)) {
+  if(irig$S1[i] > 0) {temp$S1[i] = 1} else {temp$S1[i] = 0}
+  if(irig$S2[i] > 0) {temp$S2[i] = 1} else {temp$S2[i] = 0}
+  if(irig$S3[i] > 0) {temp$S3[i] = 1} else {temp$S3[i] = 0}
+  if(irig$S4[i] > 0) {temp$S4[i] = 1} else {temp$S4[i] = 0}
+}
+
+temp2 <- cumsum(temp)
+temp2$date <- irig$date
+
+pulse_num <- data.frame(date = seq(as.Date("2023-07-03", tz = "America/Phoenix"),
+                                   as.Date("2023-09-04", tz = "America/Phoenix"),
+                                   by = 1)) |> 
+  left_join(temp2, by = join_by("date")) |> 
+  fill(starts_with("S")) |> 
+  pivot_longer(starts_with("S"),
+               names_to = "trt_s",
+               values_to = "pulse_num")
+
 # create days since last pulse by treatment
 irig_long <- data.frame(date = seq(as.Date("2023-07-03", tz = "America/Phoenix"),
                                      as.Date("2023-09-04", tz = "America/Phoenix"),
@@ -251,7 +275,8 @@ pulse_days <- irig_long %>%
 # match days since pulse to  wp_rwc and wp_wide2
 
 wp_rwc_out <- wp_rwc |> 
-  left_join(pulse_days, by = join_by("date_col" == "date", "trt_s"))
+  left_join(pulse_days, by = join_by("date_col" == "date", "trt_s")) |> 
+  left_join(pulse_num, by = join_by("date_col" == "date", "trt_s"))
 
 wp_rwc_out |> 
   ggplot(aes(x = days_since_pulse)) +
