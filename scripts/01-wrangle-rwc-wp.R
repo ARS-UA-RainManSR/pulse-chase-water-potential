@@ -18,8 +18,28 @@ rwc <- read_sheet("https://docs.google.com/spreadsheets/d/1R2auYuNOX0z3-01NkyFAt
   filter(date_col >= as.Date("2023-08-14"))
 
 ### Test which duplicate to remove
+dups <- WP |> 
+  select(-time_wp, -notes, -cID) |> 
+  group_by(date_col, period, house, plot) |> 
+  count() |> 
+  filter(n > 1) # 2 sets of midday duplicates
 
+# Combine RWC with WP set
 both_t <- cbind.data.frame(rwc, wp_mpa = WP$wp_mpa)
+
+# plot duplicate middays against  predawns for all - which is a better fit?
+set1 <- both_t |> 
+  filter(date_col == dups$date_col[1],
+         house == dups$house[1],
+         plot == dups$plot[1])
+
+
+set2 <- both_t |> 
+  filter(date_col == dups$date_col[2],
+         house == dups$house[2],
+         plot == dups$plot[2])
+
+# duplicated WPs are excluded with RWC filters between 0.25 and 1, no need for additional cleaning
 
 both_t %>%
   filter(RWC > 0.25 & RWC < 1) %>%
@@ -154,4 +174,89 @@ ggplot() +
   theme_bw() +
   theme(axis.title.x = element_blank())
 
+# Make final combined dataset to write out
+wp_rwc <- cbind.data.frame(rwc, wp_mpa = WP$wp_mpa) |> 
+  mutate(trt_s = str_extract(trt, "S\\d"),
+         trt_w = str_extract(trt, "W\\d")) |> 
+  filter(RWC > 0.25 & RWC < 1) |> 
+  select(-7:-18)
 
+wp_rwc |> 
+  ggplot(aes(x = RWC, y = wp_mpa)) +
+  geom_point(aes(color = period)) +
+  facet_wrap(~trt_s)
+
+# Make wide with predawns and middays
+wp_wide <- wp_rwc |> 
+  select(-cID, -RWC) |> 
+  pivot_wider(names_from = period,
+              values_from = wp_mpa) # has missing pairings due to RWC filtering
+
+# Make wide only eliminating second duplicates
+dups <- WP |> 
+  select(-time_wp, -notes, -cID) |> 
+  group_by(date_col, period, house, plot) |> 
+  count() |> 
+  filter(n > 1)
+
+# rows to remove
+ind1 <- which(WP$date_col == dups$date_col[1] &
+      WP$period == dups$period[1] &
+      WP$house == dups$house[1] &
+      WP$plot == dups$plot[1])[1]
+
+ind2 <- which(WP$date_col == dups$date_col[2] &
+                WP$period == dups$period[2] &
+                WP$house == dups$house[2] &
+                WP$plot == dups$plot[2])[1]
+
+wp_wide2 <- WP[-1*c(ind1, ind2),] |> 
+  select(-plant, -cID, -time_wp, -notes) |> 
+  pivot_wider(names_from = period,
+              values_from = wp_mpa) |> 
+  mutate(trt_s = str_extract(trt, "S\\d"),
+         trt_w = str_extract(trt, "W\\d"))
+
+wp_wide2 |> 
+  ggplot(aes(x = predawn,
+             y = midday,
+             color = trt_s)) +
+  geom_point() +
+  geom_abline(slope = 1, intercept = 0, lty = 2)
+
+#### Add days since pulse by treatment
+
+irig <- read_csv("data/irrig.csv",
+                 locale = locale(tz = "America/Phoenix"))
+
+# create days since last pulse by treatment
+irig_long <- data.frame(date = seq(as.Date("2023-07-03", tz = "America/Phoenix"),
+                                     as.Date("2023-09-04", tz = "America/Phoenix"),
+                                     by = 1)) |> 
+  left_join(irig, by = join_by("date")) |> 
+  replace_na(list(S1 = 0,
+                  S2 = 0,
+                  S3 = 0,
+                  S4 = 0)) |> 
+  pivot_longer(starts_with("S"),
+               names_to = "trt_s",
+               values_to = "irig")
+
+pulse_days <- irig_long %>%
+  group_by(trt_s) %>%
+  mutate(last_event = as.Date(ifelse(irig > 0, date, NA_real_), origin = "1970-01-01")) %>%
+  fill(last_event) %>%
+  mutate(days_since_pulse = as.numeric(date - last_event))
+
+# match days since pulse to  wp_rwc and wp_wide2
+
+wp_rwc_out <- wp_rwc |> 
+  left_join(pulse_days, by = join_by("date_col" == "date", "trt_s"))
+
+wp_rwc_out |> 
+  ggplot(aes(x = days_since_pulse)) +
+  geom_point(aes(y = wp_mpa,
+                 color = as.factor(pulse_num))) +
+  facet_grid(cols = vars(trt_s),
+             rows = vars(period))
+   
