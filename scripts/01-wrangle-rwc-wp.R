@@ -270,13 +270,13 @@ pulse_days <- irig_long %>%
   group_by(trt_s) %>%
   mutate(last_event = as.Date(ifelse(irig > 0, date, NA_real_), origin = "1970-01-01")) %>%
   fill(last_event) %>%
-  mutate(days_since_pulse = as.numeric(date - last_event))
+  mutate(days_since_pulse = as.numeric(date - last_event)) |> 
+  left_join(pulse_num, by = join_by("date", "trt_s"))
 
 # match days since pulse to  wp_rwc and wp_wide2
 
 wp_rwc_out <- wp_rwc |> 
-  left_join(pulse_days, by = join_by("date_col" == "date", "trt_s")) |> 
-  left_join(pulse_num, by = join_by("date_col" == "date", "trt_s"))
+  left_join(pulse_days, by = join_by("date_col" == "date", "trt_s")) 
 
 wp_rwc_out |> 
   ggplot(aes(x = days_since_pulse)) +
@@ -287,8 +287,7 @@ wp_rwc_out |>
    
 
 wp_wide_out <- wp_wide2 |> 
-  left_join(pulse_days, by = join_by("date_col" == "date", "trt_s")) |> 
-  left_join(pulse_num, by = join_by("date_col" == "date", "trt_s"))
+  left_join(pulse_days, by = join_by("date_col" == "date", "trt_s")) 
 
 
 wp_wide_out |> 
@@ -305,4 +304,4 @@ write_csv(wp_wide_out, "data_clean/wp_wide.csv")
 
 write_csv(irig_long, "data_clean/irig_long.csv")
 
-write_csv(pulse_num, "data_clean/pulse_num.csv")
+write_csv(pulse_days, "data_clean/pulse_num_days.csv")

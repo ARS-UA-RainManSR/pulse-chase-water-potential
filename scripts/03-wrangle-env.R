@@ -10,7 +10,7 @@ env <- read_csv("data/env/Halfhourly_VWC_SWP_Weather_092323.csv",
   filter(TIMESTAMP >= as.POSIXct("2023-08-14 00:00:00", 
                                  tz = "America/Phoenix"))
 
-pulse_num <- read_csv("data_clean/pulse_num.csv")
+pulse_num <- read_csv("data_clean/pulse_num_days.csv")
 #### Create VPD data half-hourly
 
 vpd <- env |> 
