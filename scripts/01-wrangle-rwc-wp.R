@@ -304,3 +304,5 @@ write_csv(wp_rwc_out, "data_clean/wp_rwc.csv")
 write_csv(wp_wide_out, "data_clean/wp_wide.csv")
 
 write_csv(irig_long, "data_clean/irig_long.csv")
+
+write_csv(pulse_num, "data_clean/pulse_num.csv")

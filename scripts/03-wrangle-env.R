@@ -10,6 +10,7 @@ env <- read_csv("data/env/Halfhourly_VWC_SWP_Weather_092323.csv",
   filter(TIMESTAMP >= as.POSIXct("2023-08-14 00:00:00", 
                                  tz = "America/Phoenix"))
 
+pulse_num <- read_csv("data_clean/pulse_num.csv")
 #### Create VPD data half-hourly
 
 vpd <- env |> 
@@ -55,6 +56,22 @@ vpd_comb |>
   geom_line() +
   facet_wrap(~location) +
   theme_bw()
+
+#### Create CDE cumulative D exposure for daytime/inside
+cde <- pulse_num |> 
+  left_join(vpd_daytime |> select(1:2),
+            by = join_by("date")) |> 
+  drop_na() |> 
+  rename(vpd = D_inside_day_mean) |> 
+  mutate(excess_D = if_else(vpd > 1, vpd - 1, 0)) |> 
+  # filter(pulse_num == 3) |> 
+  group_by(trt_s, pulse_num) |> 
+  mutate(cde = cumsum(excess_D))
+
+ggplot(cde) +
+  geom_point(aes(x = date,
+                 y = cde)) +
+  facet_wrap(~pulse_num)
 
 #### Create VWC data by treatment 
 colnames(env)
@@ -118,3 +135,4 @@ vwc_trt_comb |>
 
 write_csv(vpd_comb, "data_clean/vpd_daily_daytime.csv")
 write_csv(vwc_trt_comb, "data_clean/vwc_daily_daytime.csv")
+write_csv(cde, "data_clean/cde_daytime_pulse.csv")
