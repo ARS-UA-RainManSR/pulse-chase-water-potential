@@ -36,8 +36,30 @@ vpd_daytime <- vpd |>
             D_outside_day_mean = mean(D_outside, na.rm = TRUE),
             D_outside_day_sd = sd(D_outside, na.rm = TRUE))
 
+vpd_PD <- vpd |> 
+  mutate(date = as.Date(TIMESTAMP, tz = "America/Phoenix"),
+         hr = hour(TIMESTAMP) + minute(TIMESTAMP)/60) |> 
+  filter(hr >= 4, hr <= 6) |>  # set PD as between 4 am and 6 am
+  group_by(date) |> 
+  summarize(D_inside_PD_mean = mean(D_inside, na.rm = TRUE),
+            D_inside_PD_sd = sd(D_inside, na.rm = TRUE),
+            D_outside_PD_mean = mean(D_outside, na.rm = TRUE),
+            D_outside_PD_sd = sd(D_outside, na.rm = TRUE))
+
+vpd_MD <- vpd |> 
+  mutate(date = as.Date(TIMESTAMP, tz = "America/Phoenix"),
+         hr = hour(TIMESTAMP) + minute(TIMESTAMP)/60) |> 
+  filter(hr >= 11, hr <= 13) |>  # set MD as between 11 am and 1 pm
+  group_by(date) |> 
+  summarize(D_inside_MD_mean = mean(D_inside, na.rm = TRUE),
+            D_inside_MD_sd = sd(D_inside, na.rm = TRUE),
+            D_outside_MD_mean = mean(D_outside, na.rm = TRUE),
+            D_outside_MD_sd = sd(D_outside, na.rm = TRUE))
+
 vpd_comb <- vpd_daily |> 
   left_join(vpd_daytime, by = join_by("date")) |> 
+  left_join(vpd_PD, by = join_by("date")) |> 
+  left_join(vpd_MD, by = join_by("date")) |> 
   pivot_longer(starts_with("D_"),
                names_to = c("location", "period", "type"),
                names_pattern = "D_(.*)_(.*)_(.*)",
