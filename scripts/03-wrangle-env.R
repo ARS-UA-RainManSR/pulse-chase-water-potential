@@ -109,8 +109,17 @@ vwc_trt_daytime <- vwc_long |>
   summarize(vwc_day_mean = mean(VWC, na.rm = TRUE),
             vwc_day_sd = sd(VWC, na.rm = TRUE))
 
+vwc_trt_morning <- vwc_long |> 
+  mutate(date = as.Date(TIMESTAMP, tz = "America/Phoenix"),
+         hr = hour(TIMESTAMP) + minute(TIMESTAMP)/60) |> 
+  filter(hr >= 4.5, hr <= 12) |>  # set morning as between 4:30 am and 12 pm
+  group_by(date, summer, depth) |> 
+  summarize(vwc_morn_mean = mean(VWC, na.rm = TRUE),
+            vwc_morn_sd = sd(VWC, na.rm = TRUE))
+
 vwc_trt_comb <- vwc_trt_daily |> 
   left_join(vwc_trt_daytime, by = join_by("date", "summer", "depth")) |> 
+  left_join(vwc_trt_morning, by = join_by("date", "summer", "depth")) |> 
   pivot_longer(starts_with("vwc"),
                names_to = c("period", "type"),
                names_pattern = "vwc_(.*)_(.*)",
