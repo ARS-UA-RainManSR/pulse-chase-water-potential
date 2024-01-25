@@ -10,6 +10,7 @@ vpd_day <- read_csv("data_clean/vpd_daily_daytime.csv") |>
          location == "inside") |> 
   select(-location, -interval, -sd) |> 
   rename("Dmean_day" = mean)
+
 # PD and MD VPD
 vpd_int <- read_csv("data_clean/vpd_daily_daytime.csv") |> 
   rename("interval" = "period") |> 
@@ -20,7 +21,7 @@ vpd_int <- read_csv("data_clean/vpd_daily_daytime.csv") |>
    pivot_wider(names_from = interval,
                values_from = mean) |> 
   rename("Dmean_PD" = "PD", "Dmean_MD" = "MD")
-# use morning
+# use morning VWC, between 4:30 am and 12 pm
 vwc <- read_csv("data_clean/vwc_daily_daytime.csv") |> 
   rename("interval" = "period") |> 
   filter(interval == "morn") |> 
@@ -51,6 +52,12 @@ cde <- read_csv("data_clean/cde_daytime_pulse.csv") |>
 # Quick scatterplots
 # can't really use CDE, as it indexes time calculated by pulse and is not generally available
 wp_all |> 
+  ggplot() +
+  geom_point(aes(x = date_col, y = predawn)) +
+  geom_line(aes(x = date_col, y = SWC_2*10, col = "VWC 25cm")) +
+  facet_wrap(~trt_s)
+ 
+ wp_all |> 
    ggplot() +
    geom_point(aes(x = Dmean_PD, y = predawn, col = factor(house))) +
    facet_grid(cols = vars(trt_s))

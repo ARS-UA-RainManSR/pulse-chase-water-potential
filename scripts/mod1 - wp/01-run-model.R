@@ -6,7 +6,7 @@ load.module("dic")
 library(mcmcplots)
 library(broom.mixed)
 
-dat_df <- read_csv("scripts/mod1 - pd/data_long.csv")
+dat_df <- read_csv("scripts/mod1 - wp/data_long.csv")
 
 dat_df |> 
   group_by(date_col, house, period) |> 
@@ -15,9 +15,9 @@ dat_df |>
   summarize(WP_sd = sd(WP_m))
 
 datlist <- list(wp = dat_df$WP,
-                D = as.vector(scale(dat_df$Dmean_period)),
-                W1 = as.vector(scale(dat_df$SWC_1)),
-                W2 = as.vector(scale(dat_df$SWC_2)),
+                D = as.vector(scale(dat_df$Dmean_period)), # PD or MD scaled VPD
+                W1 = as.vector(scale(dat_df$SWC_1)), # morning only 4:30 am to 12 noon
+                W2 = as.vector(scale(dat_df$SWC_2)), # morning only 4:30 am to 12 noon
                 house = dat_df$house,
                 N = nrow(dat_df),
                 Nparam = 7,
