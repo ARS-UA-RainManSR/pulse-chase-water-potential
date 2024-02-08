@@ -1,0 +1,65 @@
+model{
+  for(i in 1:N) {
+    # Likelihood
+    vwc[i] ~ dnorm(mu[i], tau)
+    # Replicated
+    vwc.rep[i] ~ dnorm(mu[i], tau)
+    # Squared differences
+    sqdiff[i] <- pow(vwc[i] - vwc.rep[i], 2)
+    # Residuals
+    resid[i] <- mu[i] - vwc[i]
+    
+    # Ricker model + intercept
+    mu[i] <- c[variable[i], period[i], plot[i]] + a[variable[i], period[i], plot[i]] * dop[i] * exp(-b[variable[i], period[i], plot[i]] * dop[i])
+  }
+  
+  # Loop throgh wp/rwc and plot-level parameters
+  for(j in 1:2) {
+    for(k in 1:2){
+      for(l in 1:Nplot) {
+        # Priors for Ricker parameters
+        c[j,k,l] ~ dnorm(mu.c[j,k], tau.c[j,k])
+        a[j,k,l] ~ dnorm(mu.a[j,k], tau.a[j,k])
+        b[j,k,l] ~ dgamma(r.b[j,k], lambda.b[j,k])
+      }
+    }
+  }
+  
+  # Loop through wp/rwc and pd/md  
+  for(j in 1:2) {
+    for(k in 1:2) {
+    
+      # Priors for Ricker hyper-parameters
+      mu.c[j,k] ~ dnorm(0, 0.001)
+      tau.c[j,k] ~ dgamma(0.1, 0.1)
+      mu.a[j,k] ~ dnorm(0, 0.001)
+      tau.a[j,k] ~ dgamma(0.1, 0.1)
+      
+      mu.b[j,k] ~ dnorm(0, 0.001)
+      var.b[j,k] ~ dgamma(0.1, 0.1)
+      
+      # Reparameterize
+      lambda.b[j,k] <-  mu.b[j,k]/var.b[j,k]
+      r.b[j,k] <- pow(mu.b[j,k], 2)/var.b[j,k]
+      
+      
+      # Calculated values
+      peak.x[j,k] <- 1/mu.b[j,k]
+      peak.y[j,k] <- mu.a[j,k]/mu.b[j,k]*exp(-1) + mu.c[j,k]
+    }
+  }
+  
+  # Variance terms
+  tau ~ dgamma(0.01, 0.01)
+  sig <- pow(tau, -0.5)
+
+  
+  # Dsum
+  Dsum <- sum(sqdiff[])
+  # Bayesian R2
+  # Compute Bayesian R2 value
+  var.pred <- pow(sd(mu[]),2)
+  var.resid <- 1/tau
+  R2 <- var.pred/(var.pred + var.resid)
+ 
+}
