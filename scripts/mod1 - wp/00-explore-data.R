@@ -116,7 +116,10 @@ wp_long <- wp_wide |>
                          "period" == "interval")) |> 
   rename("Dmean_period" = "Dmean") |> 
   left_join(vpd_day, by = join_by("date_col" == "date")) |> 
-  left_join(vwc, by = join_by("date_col" == "date", "trt_s" == "summer"))
+  left_join(vwc, by = join_by("date_col" == "date", "trt_s" == "summer")) |> 
+  mutate(pulse_num2 = case_when(pulse_num %in% c(3, 7, 13) ~ "Aug 14",
+                                pulse_num %in% c(8, 15) ~ "Aug 21") |> 
+           as.factor())
 
 wp_long |> 
   ggplot(aes(x = Dmean_day, y = WP, col = period)) +
@@ -133,16 +136,25 @@ wp_long |>
   geom_point(aes(shape = factor(house))) +
   facet_grid(cols = vars(trt_s))
 
+####  Across all treatments, thresholds in SWC and SWP for WP? ####
 wp_long |> 
   ggplot(aes(x = SWC_1, y = WP, col = trt_s)) +
   geom_point(aes(shape = factor(house))) +
-  facet_wrap(~period)
-
+  facet_wrap(~period) +
+  theme_bw()
 
 wp_long |> 
-  ggplot(aes(x = Dmean_day, y = WP, col = trt_s)) +
+  filter(pulse_num2 == "Aug 14") |>
+  # filter(period == "PD") |> 
+  ggplot(aes(x = SWC_1, y = WP, col = trt_s)) +
   geom_point(aes(shape = factor(house))) +
-  facet_wrap(~period, scales = "free_x")
+  geom_path(arrow = arrow(type = "closed",
+                          length = unit(0.2, "cm")),
+            show.legend = FALSE,
+            color = "black") +
+  facet_grid(cols = vars(trt_s),
+             rows = vars(period)) +
+  theme_bw()
 
 # check for house REs
 wp_long |> 
