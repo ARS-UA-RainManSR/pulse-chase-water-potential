@@ -11,7 +11,8 @@ WP <- read_sheet("https://docs.google.com/spreadsheets/d/1R2auYuNOX0z3-01NkyFAtS
 
 rwc <- read_sheet("https://docs.google.com/spreadsheets/d/1R2auYuNOX0z3-01NkyFAtSn-aivZHvRNqWVb1_ThTcA/edit#gid=1859918857",
                      sheet = "RWC") %>%
-  mutate(mass_fresh = vial_cap_fresh_g - vial_cap_g,
+  mutate(ID = paste0("H", house, "P", plot), 
+         mass_fresh = vial_cap_fresh_g - vial_cap_g,
          mass_dry = vial_dry_g - vial_g,
          RWC = (mass_fresh - mass_dry) / (saturated_g - mass_dry),
          date_col = as.Date(date_col)) %>%
@@ -179,7 +180,8 @@ wp_rwc <- cbind.data.frame(rwc, wp_mpa = WP$wp_mpa) |>
   mutate(trt_s = str_extract(trt, "S\\d"),
          trt_w = str_extract(trt, "W\\d")) |> 
   filter(RWC > 0.25 & RWC < 1) |> 
-  select(-7:-18)
+  relocate(ID, .after = plot) |> 
+  select(-8:-19)
 
 wp_rwc |> 
   ggplot(aes(x = RWC, y = wp_mpa)) +
