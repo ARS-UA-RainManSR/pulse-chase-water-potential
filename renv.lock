@@ -1198,6 +1198,17 @@
       ],
       "Hash": "7ce2733a9826b3aeb1775d56fd305472"
     },
+    "mcmc": {
+      "Package": "mcmc",
+      "Version": "0.9-8",
+      "Source": "Repository",
+      "Repository": "RSPM",
+      "Requirements": [
+        "R",
+        "stats"
+      ],
+      "Hash": "d96d8fc4c4682220c601d294d2bc387e"
+    },
     "mcmcplots": {
       "Package": "mcmcplots",
       "Version": "0.4.3",
@@ -1457,6 +1468,24 @@
         "stats"
       ],
       "Hash": "ceb5c2a59ba33d42d051285a3e8a5118"
+    },
+    "postjags": {
+      "Package": "postjags",
+      "Version": "1.0.0.1",
+      "Source": "GitHub",
+      "RemoteType": "github",
+      "RemoteHost": "api.github.com",
+      "RemoteUsername": "fellmk",
+      "RemoteRepo": "PostJAGS",
+      "RemoteSubdir": "postjags",
+      "RemoteRef": "master",
+      "RemoteSha": "582b484f2c4ec17280f0db87c398479ed1b61ef8",
+      "Requirements": [
+        "R",
+        "coda",
+        "mcmc"
+      ],
+      "Hash": "60ba6d8645ae9bc1bc46e152a2b2ddfe"
     },
     "praise": {
       "Package": "praise",
