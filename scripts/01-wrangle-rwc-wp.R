@@ -89,6 +89,26 @@ both_t |>
   theme_bw()
 
 
+### remove rwc < 0.25 and > 1, make long witih wp###
+
+rwc_temp <- rwc |> 
+  filter(RWC > 0.25 & RWC < 1 ) |>  # eliminates 18 values
+  select(intersect(colnames(rwc), colnames(WP)), time_fresh, RWC) |> 
+  rename(value = RWC, 
+         time = time_fresh) |> 
+  mutate(variable = "RWC")
+
+wp_temp <- WP |> 
+  select(intersect(colnames(rwc), colnames(WP)), time_wp, wp_mpa) |> 
+  rename(value = wp_mpa,
+         time = time_wp) |> 
+  mutate(variable = "WP")
+  
+df_long <- rwc_temp |> 
+  bind_rows(wp_temp) |> 
+  mutate(trt_s = str_extract(trt, "S\\d"),
+         trt_w = str_extract(trt, "W\\d"))
+
 # Check by treatment over time
 
 WP_sum <- both_t |> 
@@ -275,7 +295,7 @@ pulse_days <- irig_long %>%
   mutate(days_since_pulse = as.numeric(date - last_event)) |> 
   left_join(pulse_num, by = join_by("date", "trt_s"))
 
-# match days since pulse to  wp_rwc and wp_wide2
+# match days since pulse to wp_rwc, wp_wide2, and df_long
 
 wp_rwc_out <- wp_rwc |> 
   left_join(pulse_days, by = join_by("date_col" == "date", "trt_s")) 
@@ -299,10 +319,15 @@ wp_wide_out |>
   facet_grid(cols = vars(trt_s),
              rows = vars(pulse_num))
 
+df_long_out <- df_long |> 
+  left_join(pulse_days, by = join_by("date_col" == "date", "trt_s")) 
+
 # Write out to data_clean/
 write_csv(wp_rwc_out, "data_clean/wp_rwc.csv")
 
 write_csv(wp_wide_out, "data_clean/wp_wide.csv")
+
+write_csv(df_long_out, "data_clean/wp_rwc_long.csv")
 
 write_csv(irig_long, "data_clean/irig_long.csv")
 
