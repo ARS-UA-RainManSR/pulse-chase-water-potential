@@ -140,7 +140,7 @@ resids |>
              scales = "free_x",
              space = "free")
 
-save(coda_resid, file = "scripts/mod3 - Gardner/coda/coda_site_resid.Rdata")
+save(coda_resid, file = "scripts/mod3 - Gardner/coda/coda_resid_site.Rdata")
 
 # Sample predicted values
 coda_pred <- coda.samples(jm,
@@ -156,7 +156,7 @@ pred_sum <- tidyMCMC(coda_pred,
 
 preds <- cbind.data.frame(mrc, pred_sum)
 
-save(coda_pred, file = "scripts/mod3 - Gardner/coda/coda_site_pred.Rdata")
+save(coda_pred, file = "scripts/mod3 - Gardner/coda/coda_pred_site.Rdata")
 
 # fit
 preds |> 
@@ -180,6 +180,7 @@ preds |>
   guides(color = "none")
 
 # Create predictions from site-level params
+load("scripts/mod3 - Gardner/coda/coda_params_site.Rdata")
 param_sum <- tidyMCMC(coda_params,
                       conf.int = TRUE,
                       conf.method = "HPDinterval") %>%
@@ -210,11 +211,14 @@ ggplot() +
 
 mrc |> 
   ggplot() +
-  geom_point(aes(x = vwc, y = abs(wp), color = factor(depth))) +
+  geom_point(aes(x = vwc, y = abs(wp), color = factor(depth)),
+             alpha = 0.5) +
   geom_line(data = pred_m, 
             aes(x = vwc,
                 y = abs(swp))) +
-  scale_x_continuous(expression(paste(Theta, " (", cm^3, " ", cm^-3, ")"))) +
-  scale_y_continuous(expression(paste(Psi[soil], " (-MPa)"))) +
+  scale_x_continuous(expression(paste(Theta, " (", cm^3, " ", cm^-3, ")")),
+                     limits = range(vwc$mean, na.rm = TRUE)) +
+  scale_y_continuous(expression(paste(Psi[soil], " (-MPa)")),
+                     limits = c(0, 10)) +
   theme_bw(base_size = 14) +
-  guides(color = "none")
+  theme(legend.position = "bottom")
