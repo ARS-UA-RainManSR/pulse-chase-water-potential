@@ -2079,6 +2079,16 @@
       ],
       "Hash": "f561504ec2897f4d46f0c7657e488ae1"
     },
+    "udunits2": {
+      "Package": "udunits2",
+      "Version": "0.13.2.1",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Requirements": [
+        "R"
+      ],
+      "Hash": "b88cada8058e2370a1950ea8407328b4"
+    },
     "utf8": {
       "Package": "utf8",
       "Version": "1.2.3",
