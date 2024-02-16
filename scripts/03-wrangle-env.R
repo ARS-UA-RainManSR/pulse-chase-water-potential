@@ -2,6 +2,7 @@
 library(readxl)
 library(tidyverse)
 library(plantecophys)
+source("source/vwc2swp.R")
 
 trt <- read_excel("data/treatments.xlsx")
 
@@ -115,13 +116,18 @@ vwc_long <- env |>
                               plot == Plot)) |> 
   mutate(trt = paste0("W", Winter, "S", Summer),
          summer = paste0("S", Summer)) |> 
-  select(-Winter, -Summer)
+  select(-Winter, -Summer) |> 
+  mutate(SWP = case_when(depth == "0-12 cm" ~ vwc2swp(VWC, param = "depth10cm"),
+                         depth == "25 cm" ~ vwc2swp(VWC, param = "depth25cm"),
+                         depth == "75 cm" ~ vwc2swp(VWC, param = "depth25cm")))
 
 vwc_trt_daily <- vwc_long |> 
   mutate(date = as.Date(TIMESTAMP, tz = "America/Phoenix")) |> 
   group_by(date, summer, depth) |> 
   summarize(vwc_daily_mean = mean(VWC, na.rm = TRUE),
-            vwc_daily_sd = sd(VWC, na.rm = TRUE))
+            vwc_daily_sd = sd(VWC, na.rm = TRUE),
+            swp_daily_mean = mean(SWP, na.rm = TRUE),
+            swp_daily_sd = sd(SWP, na.rm = TRUE))
 
 vwc_trt_daytime <- vwc_long |> 
   mutate(date = as.Date(TIMESTAMP, tz = "America/Phoenix"),
@@ -129,7 +135,9 @@ vwc_trt_daytime <- vwc_long |>
   filter(hr >= 7, hr <= 19) |>  # set daytime as between 7 am and 7 pm
   group_by(date, summer, depth) |> 
   summarize(vwc_day_mean = mean(VWC, na.rm = TRUE),
-            vwc_day_sd = sd(VWC, na.rm = TRUE))
+            vwc_day_sd = sd(VWC, na.rm = TRUE),
+            swp_day_mean = mean(SWP, na.rm = TRUE),
+            swp_day_sd = sd(SWP, na.rm = TRUE))
 
 vwc_trt_morning <- vwc_long |> 
   mutate(date = as.Date(TIMESTAMP, tz = "America/Phoenix"),
@@ -137,11 +145,14 @@ vwc_trt_morning <- vwc_long |>
   filter(hr >= 4.5, hr <= 12) |>  # set morning as between 4:30 am and 12 pm
   group_by(date, summer, depth) |> 
   summarize(vwc_morn_mean = mean(VWC, na.rm = TRUE),
-            vwc_morn_sd = sd(VWC, na.rm = TRUE))
+            vwc_morn_sd = sd(VWC, na.rm = TRUE),
+            swp_morn_mean = mean(SWP, na.rm = TRUE),
+            swp_morn_sd = sd(SWP, na.rm = TRUE))
 
 vwc_trt_comb <- vwc_trt_daily |> 
   left_join(vwc_trt_daytime, by = join_by("date", "summer", "depth")) |> 
   left_join(vwc_trt_morning, by = join_by("date", "summer", "depth")) |> 
+  select(-starts_with("swp")) |> 
   pivot_longer(starts_with("vwc"),
                names_to = c("period", "type"),
                names_pattern = "vwc_(.*)_(.*)",
@@ -162,8 +173,33 @@ vwc_trt_comb |>
              cols = vars(summer)) +
   theme_bw()
 
+swp_trt_comb <- vwc_trt_daily |> 
+  left_join(vwc_trt_daytime, by = join_by("date", "summer", "depth")) |> 
+  left_join(vwc_trt_morning, by = join_by("date", "summer", "depth")) |> 
+  select(-starts_with("vwc")) |> 
+  pivot_longer(starts_with("swp"),
+               names_to = c("period", "type"),
+               names_pattern = "swp_(.*)_(.*)",
+               values_to = "value") |> 
+  pivot_wider(names_from = "type",
+              values_from = "value")
+
+swp_trt_comb |> 
+  ggplot(aes(x = date, y = mean,
+             color = period)) +
+  geom_errorbar(aes(ymin = mean - sd,
+                    ymax = mean + sd,),
+                alpha = 0.25,
+                width = 0) +
+  geom_point() +
+  geom_line() +
+  facet_grid(rows = vars(depth),
+             cols = vars(summer)) +
+  theme_bw()
+
 # write out
 
 write_csv(vpd_comb, "data_clean/vpd_daily_daytime.csv")
 write_csv(vwc_trt_comb, "data_clean/vwc_daily_daytime.csv")
+write_csv(swp_trt_comb, "data_clean/swp_daily_daytime.csv")
 write_csv(cde, "data_clean/cde_daytime_pulse.csv")
