@@ -1,0 +1,70 @@
+model{
+  
+  for(i in 1:N) {
+    # Likelihood
+    y[i] ~ dnorm(mu[i], tau)
+    # Predicted y's
+    y.rep[i] ~ dnorm(mu[i], tau)
+    # residuals
+    resid[i] <- mu[i] - y[i]
+    # squared differences
+    sqdiff[i] <- pow(y[i] - y.rep[i], 2)
+    
+    # Linear model - different slopes before and after changepoints, flat slope in between
+    mu[i] <- 
+    step(cp[1,plot[i]] - dop[i]) * (a[plot[i]] + b[1,plot[i]] * dop[i]) +
+    step((dop[i] - cp[1,plot[i]])*(cp[2,plot[i]] - dop[i])) * (cp[1,plot[i]]*b[1,plot[i]] + a[plot[i]])+
+    step(dop[i] - cp[2,plot[i]]) * (b[2,plot[i]] * dop[i] + int_part[i])
+  
+  int_part[i] <- cp[1,plot[i]]*b[1,plot[i]] + a[plot[i]] - b[2,plot[i]]*cp[2,plot[i]]
+
+  }
+  
+  # Priors for plot-level parameters
+  for(p in 1:Nplot) { # for each plot
+    for(t in 1:2) { # for each time point
+      b[t,p] ~ dnorm(mu.b[t], tau.b[t])
+      cp[t,p] ~ dnorm(mu.cp[t], tau.cp[t])
+    }
+    # only one intercept to estimate
+    a[p] ~ dnorm(mu.a, tau.a)
+    # maximum value by plot
+    maxy[p] <- cp[1,p]*b[1,p] + a[p]
+  }
+  
+  # params to monitor
+  mu.maxy <- mean(maxy[])
+  
+  
+  # priors for root node parameters
+  for(t in 1:2) { # for each time point
+    # slopes
+    mu.b[t] ~ dnorm(0, 0.001)
+    # variance among slopes
+    tau.b[t] <- pow(sig.b[t], -2)
+    sig.b[t] ~ dunif(0, 10)
+    # variance among changepoints
+    tau.cp[t] <- pow(sig.cp[t], -2)
+    sig.cp[t] ~ dunif(0, 10)
+  }
+  # intercept
+  mu.a ~ dnorm(0, 0.001)
+  tau.a <- pow(sig.a, -2)
+  sig.a ~ dunif(0, 10)
+
+  # separate informative priors for changepoints
+  mu.cp[1] ~ dunif(0.5, 5)
+  mu.cp[2] ~ dunif(10, 15)
+
+  # Population precision
+  tau ~ dgamma(0.01, 0.01)
+  sig <- pow(tau, -0.5)
+  
+  # Dsum
+  Dsum <- sum(sqdiff[])
+  # Bayesian R2
+  # Compute Bayesian R2 value
+  var.pred <- pow(sd(mu[]),2)
+  var.resid <- 1/tau
+  R2 <- var.pred/(var.pred + var.resid)
+}

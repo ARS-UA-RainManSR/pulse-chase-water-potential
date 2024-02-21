@@ -1,0 +1,51 @@
+model{
+  
+  for(i in 1:N) {
+    # Likelihood
+    y[i] ~ dnorm(mu[i], tau)
+    # Predicted y's
+    y.rep[i] ~ dnorm(mu[i], tau)
+    # residuals
+    resid[i] <- mu[i] - y[i]
+    # squared differences
+    sqdiff[i] <- pow(y[i] - y.rep[i], 2)
+    
+    # Linear model - different slopes before and after single changepoint
+    mu[i] <- a[plot[i]] + b[step(dop[i] - cp[plot[i]]) + 1, plot[i]] * (dop[i] - cp[plot[i]])
+    # Step function to toggle between 
+    # J[plot[i]] <- step(dop[i] - cp[plot[i]]) + 1
+    
+  }
+  
+  # Priors for plot-level parameters
+  for(p in 1:Nplot) { 
+    a[p] ~ dnorm(mu.a, tau.a)
+    b[1,p] ~ dnorm(mu.b[1], tau.b[1])
+    b[2,p] ~ dnorm(mu.b[2], tau.b[2])
+    cp[p] ~ dnorm(mu.cp, tau.cp)
+  }
+  
+  # priors for root node parameters
+  mu.a ~ dnorm(0, 0.001)
+  for(j in 1:2) {
+    mu.b[j] ~ dnorm(0, 0.001)
+    tau.b[j] <- pow(sig.b[j], -2)
+    sig.b[j] ~ dunif(0,10)
+  }
+  mu.cp ~ dunif(0.5, 3)
+  tau.a <- pow(sig.a, -2)
+  sig.a ~ dunif(0, 10)
+  tau.cp <- pow(sig.cp, -2)
+  sig.cp ~ dunif(0, 1)
+  
+  tau ~ dgamma(0.01, 0.01)
+  sig <- pow(tau, -0.5)
+  
+  # Dsum
+  Dsum <- sum(sqdiff[])
+  # Bayesian R2
+  # Compute Bayesian R2 value
+  var.pred <- pow(sd(mu[]),2)
+  var.resid <- 1/tau
+  R2 <- var.pred/(var.pred + var.resid)
+}
