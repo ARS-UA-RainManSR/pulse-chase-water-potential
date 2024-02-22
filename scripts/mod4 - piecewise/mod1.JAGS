@@ -30,10 +30,13 @@ model{
     a[p] ~ dnorm(mu.a, tau.a)
     # maximum value by plot
     maxy[p] <- cp[1,p]*b[1,p] + a[p]
+    # 2nd intercept by plot
+    a2[p] <- cp[1,p]*b[1,p] + a[p] - b[2,p]*cp[2,p]
   }
   
   # params to monitor
   mu.maxy <- mean(maxy[])
+  mu.a2 <- mean(a2[])
   
   
   # priors for root node parameters

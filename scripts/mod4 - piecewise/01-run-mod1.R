@@ -60,7 +60,8 @@ dic.samples(jm, 10000)
 
 # Sample 
 params_vec <- c("deviance", "Dsum", "R2",
-                "mu.a", "a", "mu.b", "b", "mu.cp", "cp", "maxy", "mu.maxy",
+                "mu.a", "a", "mu.b", "b", "mu.cp", "cp", 
+                "maxy", "mu.maxy", "a2", "mu.a2",
                 "sig.a", "sig.b", "sig.cp", "sig", "tau")
 coda_params <- coda.samples(jm, variable.names = params_vec,
                             n.iter = 10000,
