@@ -26,7 +26,8 @@ wp_sum <- wp |>
             WP_sd = sd(value, na.rm = TRUE),
             WP_n = sum(length(!is.na(value)))) |> 
   # dummy vector to connect the points
-  mutate(pulse_num2 = if_else(pulse_num == 8, 7, pulse_num))
+  mutate(pulse_num2 = if_else(pulse_num == 8, 7, pulse_num),
+         pulse_num2 = if_else(pulse_num2 == 4, 3, pulse_num2))
 
 rwc_sum <- rwc |> 
   group_by(date_col, pulse_num, trt_s, period2) |> 
@@ -34,7 +35,8 @@ rwc_sum <- rwc |>
             RWC_sd = sd(value, na.rm = TRUE),
             RWC_n = sum(length(!is.na(value)))) |> 
   # dummy vector to connect the points
-  mutate(pulse_num2 = if_else(pulse_num == 8, 7, pulse_num))
+  mutate(pulse_num2 = if_else(pulse_num == 8, 7, pulse_num),
+         pulse_num2 = if_else(pulse_num2 == 4, 3, pulse_num2))
 
 # Irrigation data to place vertical lines
 irig <- read_csv("data_clean/irig_long.csv") |> 
@@ -94,7 +96,8 @@ figa <-
   geom_line(data = wp_sum,
             aes(x = date_col,
                 y = WP_m,
-                color = period2)) +
+                color = period2,
+                group = interaction(pulse_num2, period2))) +
   geom_line(data = swp,
             aes(x = date,
                 y = mean,
@@ -157,7 +160,8 @@ figb <- ggplot() +
   geom_line(data = rwc_sum,
             aes(x = date_col,
                 y = RWC_m,
-                color = period2)) +
+                color = period2,
+                group = interaction(pulse_num2, period2))) +
   geom_line(data = vwc,
             aes(x = date,
                 y = mean*5,
