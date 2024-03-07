@@ -141,8 +141,8 @@ for(i in 1:length(dates)){
   
   #NDVI
   df_wide$NDVI <- calc_VI(df_wide, 850, 850, 650, 650) #literature derived chlorophyll proxies
-  df_wide$CI1 <- calc_VI(df_wide, 750, 750, 550, 550)
-  df_wide$CI2 <- calc_VI(df_wide, 750, 750, 710, 710)
+  df_wide$CI1 <- calc_VI(df_wide, 750, 750, 550, 550) # chlorophyll index 1
+  df_wide$CI2 <- calc_VI(df_wide, 750, 750, 710, 710) # chlorophyll index 2
   
   #NDWI
   df_wide$WI1 <- calc_SR(df_wide, 900, 900, 970, 970) #literature derived water content proxies
@@ -172,11 +172,42 @@ for(i in 1:length(dates)){
   write_csv(out, paste0('data/hyperspec_1/Indices_Rep1_',folders[i],".csv"))
   print(dates[i])
   print(dim(out))
-  to_merge <- rbind(to_merge, out)
 }
-colnames(out) <- c("Date", 'ID', 'House', 'Plot', 'Treat', 'Winter', 'Summer', 'Time',
-                   'NDVI', 'CI1', 'CI2', 'NDWI1', 'NDWI2', 'NDWI3', 'WI1', 'WI2', 'WI3',
-                   'PRI', 'WP', 'RWC')
 
-write_csv(to_merge, paste0('data/hyperspec_1/Indices_Rep1_merged.csv'))
+
+##### Merge files, remove duplicates, and rename ####
+
+fn <- list.files("data/hyperspec_1/")
+
+to_merge <- list()
+for(i in 1:length(fn)){
+  temp <- read_csv(paste0("data/hyperspec_1/", fn[i]),
+                   locale = locale(tz = "America/Phoenix")) 
+  to_merge[[i]] <- temp
+}
+colnames(merged)
+merged <- do.call(rbind, to_merge) |> 
+  rename(date_col = Date,
+         ID_long = ID,
+         house = House, plot = Plot, trt = Treat,
+         trt_w = Winter, trt_s = Summer, period = Time) |> 
+  mutate(ID = paste0(house, plot),
+         house = str_extract(house, "[0-9]+"),
+         plot = str_extract(plot, "[0-9]+")) |> 
+  select(-WP, -RWC)
+  
+# find duplicates
+dups <- merged |> 
+  group_by(date_col, period, trt_s, ID) |> 
+  count() |> 
+  filter(n > 1) |> 
+  select(-n) |> 
+  inner_join(merged) |> 
+  slice(1,3) # remove the first of each measurement
+
+# remove duplicates
+out <- merged |> 
+  anti_join(dups)
+
+write_csv(out, paste0('data_clean/hyp_indices.csv'))
 
