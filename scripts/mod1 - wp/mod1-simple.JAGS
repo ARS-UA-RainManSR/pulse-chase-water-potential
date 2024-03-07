@@ -1,4 +1,5 @@
-#model - PD only, Dmean,  two depths
+# WP only, Dmean by time of day and SWP shallow
+# Random effect intercepts by house/plot combs
 
 model{
   for(i in 1:N){
@@ -6,22 +7,21 @@ model{
     wp[i] ~ dnorm(mu[i], tau)
     # Replicated data
     wp.rep[i] ~ dnorm(mu[i], tau)
-    
-    mu[i] = B[1] + 
-      B[2] * D[i] +
-      B[3] * W1[i] +
-      B[4] * W2[i] +
-      B[5] * D[i] * W1[i] +
-      B[6] * D[i] * W2[i] +
-      B[7] * W1[i] * W2[i] +
-      Eps[house[i]]
-    
-    
     # Part of the calculation of the posterior predictive loss	
     Sqdiff[i] <- pow(wp.rep[i] - wp[i], 2)
+    # Residual
+    resid[i] <- mu[i] - wp[i]
+    
+    # Regression equation
+    mu[i] = B[1] + 
+      B[2] * D[i] +
+      B[3] * SWP1[i] +
+      B[4] * D[i] * SWP1[i] +
+      Eps[ID[i]] # Random effect for each house/plot combo
+
   }
   
-  for(j in 1:Nparam) { 
+  for(j in 1:Nparam) { # Total number of B parameters
     # Parameter priors
     B[j] ~ dnorm(0, 0.001)
     
@@ -29,7 +29,7 @@ model{
     Bstar[j] <- B[j] + equals(j, 1) * mean.eps
   }
   
-  for(k in 1:Nhouse) {
+  for(k in 1:Nid) { # Total number of house/plot combos, 16
     # House random effects
     Eps[k] ~ dnorm(0, tau.eps)
     
@@ -41,14 +41,11 @@ model{
   mean.eps <- mean(Eps[])
   
   # Folded T prior for among-house standard deviation
-  sig.eps.a ~ dt(0, Ta, 2) # temp SD from a T distribution
+  sig.eps.a ~ dt(0, Ta, 2) # temp from a T distribution, 2nd parameter is precision
   sig.eps <- abs(sig.eps.a) # Fold to make positive only
   tau.eps <- pow(sig.eps, -2) # Convert to precision
   Ta <- pow(Sa, -2) # Set as data, among-house SD
   
-  # Unifor prior for among-house standard deviation
-  #sig.eps ~ dunif(0, 1)
-  #tau.eps <- pow(sig.eps, -2)
   
   # priors for observation variance
   tau ~ dgamma(0.01, 0.01)
@@ -56,5 +53,9 @@ model{
   
   # Posterior predictive loss is the posterior mean of Dsum
   Dsum <- sum(Sqdiff[])
-  
+  # Bayesian R2
+  # Compute Bayesian R2 value
+  var.pred <- pow(sd(mu[]),2)
+  var.resid <- 1/tau
+  R2 <- var.pred/(var.pred + var.resid)
 }
