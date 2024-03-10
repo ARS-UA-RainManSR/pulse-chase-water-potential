@@ -89,7 +89,7 @@ labs <- c(lapply(c("PD", "0-12 cm"), function(i) bquote(Psi[.(i)])),
 
 
 # Create dataframe for Phase labels
-phases <- data.frame(lab = c("0", "Phase 1", "Phase 2"),
+phases <- data.frame(lab = c("", "Phase 1", "Phase 2"),
                      xmin = c(-Inf, cps$pred.mean),
                      xmax = c(cps$pred.mean, Inf),
                      ymin = rep(0, 3),
@@ -144,7 +144,7 @@ fig4 <- preds |>
                      guide = "axis_minor") +
   scale_color_manual(values = c(cols_gn[4], cols_br_gn[1], "coral"),
                      labels = labs) +
-  scale_fill_manual(values = cols_div[c(2,1,4)]) +
+  scale_fill_manual(values = cols_div[c(4,1,4)]) +
   theme_bw(base_size = 12) +
   theme(ggh4x.axis.ticks.length.minor = rel(1),
         panel.grid = element_blank(),
