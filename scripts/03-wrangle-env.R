@@ -8,7 +8,7 @@ trt <- read_excel("data/treatments.xlsx")
 
 env <- read_csv("data/env/Halfhourly_VWC_SWP_Weather_092323.csv",
                 locale = locale(tz = "America/Phoenix")) |> 
-  filter(TIMESTAMP >= as.POSIXct("2023-08-14 00:00:00", 
+  filter(TIMESTAMP >= as.POSIXct("2023-07-03 00:00:00", 
                                  tz = "America/Phoenix"))
 
 pulse_num <- read_csv("data_clean/pulse_num_days.csv")
@@ -94,7 +94,7 @@ cde <- pulse_num |>
 ggplot(cde) +
   geom_point(aes(x = date,
                  y = cde)) +
-  facet_wrap(~pulse_num)
+  facet_wrap(~trt_s)
 
 #### Create VWC data by treatment 
 colnames(env)
