@@ -163,13 +163,13 @@ fig4 <- preds |>
          color = guide_legend(override.aes = list(shape = c(16, NA, NA, NA),
                                                   linetype = c(NA, 1, 5, 1))))
 
-  
-  
+
+
 ggsave(filename = "fig_scripts/fig4.png",
-      plot = fig4,
-      height = 3.5,
-      width = 6,
-      units = "in")
+       plot = fig4,
+       height = 3.5,
+       width = 6,
+       units = "in")
 
 #### Calculations ####
 # What range of SWP is encompassed by the shift from
@@ -205,4 +205,6 @@ swp |>
   mean() # -0.57
 
 # As a rule of thumb, we define the threshold as SWP_2 = -0.6 MPa
+# Which in this soil is equivalent to VWC ~= 0.0495 cm3/cm3
+
 
