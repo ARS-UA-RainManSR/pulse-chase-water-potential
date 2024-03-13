@@ -101,7 +101,8 @@ pri_sum <- pri |>
 gpp <- read_csv("data/plotgas2023.csv") |>
   mutate(date_col = lubridate::mdy(Date,
                                    tz = "America/Phoenix"),
-         GPP = -NEE - ER) |>
+         ER2 = ifelse(ER < 0, 0, ER), # Restrict ER to positive values
+         GPP = -NEE + ER2) |> 
   filter(PT == "S4",
          date_col >= min(wp$date_col),
          date_col <= max(wp$date_col)) |>
@@ -125,7 +126,7 @@ gpp_sum |>
   geom_point(aes(x = days_since_pulse, y = gpp_m)) +
   geom_line(aes(x = days_since_pulse, y = gpp_m)) +
   theme_bw()
-  
+
 # Assemble panels
 cols_gn <- brewer.pal(4, "Paired")
 
@@ -133,19 +134,19 @@ cols_gn <- brewer.pal(4, "Paired")
 fig6a <- wp |>
   ggplot() +
   geom_rect(data = cps,
-             aes(xmin = pred.lower, xmax = pred.upper,
-                 ymin = -Inf, ymax = Inf),
+            aes(xmin = pred.lower, xmax = pred.upper,
+                ymin = -Inf, ymax = Inf),
             color = "gray90", alpha = 0.15) +
   geom_point(aes(x = days_since_pulse,
                  y = value,
                  color = period),
              alpha = 0.25) +
   geom_errorbar(data = wp_sum,
-            aes(x = days_since_pulse, 
-                ymin = WP_m - WP_sd,
-                ymax = WP_m + WP_sd,
-                color = period),
-            width = 0) +
+                aes(x = days_since_pulse, 
+                    ymin = WP_m - WP_sd,
+                    ymax = WP_m + WP_sd,
+                    color = period),
+                width = 0) +
   geom_point(data = wp_sum,
              aes(x = days_since_pulse,
                  y = WP_m,
@@ -310,9 +311,9 @@ fig6e <- gpp |>
 ##### combine #####
 
 fig6 <- plot_grid(fig6a, fig6b, fig6c, fig6d, fig6e,
-          ncol = 2, 
-          align = "v",
-          labels = "auto")
+                  ncol = 2, 
+                  align = "v",
+                  labels = "auto")
 
 ggsave(filename = "fig_scripts/fig6.png",
        plot = fig6,
