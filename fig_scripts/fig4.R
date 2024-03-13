@@ -29,11 +29,13 @@ vpd <- read_csv("data_clean/vpd_daily_daytime.csv") |>
 swp <- read_csv("data_clean/swp_daily_daytime.csv") |> 
   filter(period == "morn",
          summer == "S4",
-         depth == "0-12 cm",
+         depth %in% c("0-12 cm", "25 cm"),
          date >= min(temp$date_col),
          date <= max(temp$date_col)) |> 
   select(-period, -sd, depth) |> 
-  rename(trt_s = summer, SWP_1 = mean) |> 
+  pivot_wider(names_from = depth,
+              values_from = mean) |>
+  rename(trt_s = summer, SWP_1 = `0-12 cm`, SWP_2 = `25 cm`) |> 
   mutate(days_since_pulse = 0:21)
 
 # Load coda_params
@@ -84,7 +86,7 @@ cols_div <- brewer.pal(7, "Accent")
 display.brewer.pal(7, "Accent")
 
 # Create labels 
-labs <- c(lapply(c("PD", "0-12 cm"), function(i) bquote(Psi[.(i)])),
+labs <- c(lapply(c("PD", "0-12 cm", "25"), function(i) bquote(Psi[.(i)])),
           lapply(c("PD"), function(i) bquote(VPD[.(i)])))
 
 
@@ -101,13 +103,18 @@ fig4 <- preds |>
   ggplot() +
   geom_line(data = swp, 
             aes(x = days_since_pulse, y = SWP_1,
-                color = "SWP")) +
+                color = "SWP_1"),
+            lty = "solid") +
+  geom_line(data = swp, 
+            aes(x = days_since_pulse, y = SWP_2,
+                color = "SWP_2"),
+            lty = "longdash") +
   geom_line(data = vpd, 
             aes(x = days_since_pulse, y = Dmean-3,
                 color = "VPD")) +
   geom_hline(data = maxy, 
              aes(yintercept = pred.mean),
-             linetype = 2) +
+             linetype = "dotted") +
   geom_rect(data = cps,
             aes(ymin = -Inf, ymax = Inf,
                 xmin = pred.lower, xmax = pred.upper),
@@ -116,10 +123,10 @@ fig4 <- preds |>
              aes(xintercept = pred.mean)) +
   geom_abline(slope = ab1$pred.mean[2],
               intercept = ab1$pred.mean[1],
-              linetype = 2) +
+              linetype = "dotted") +
   geom_abline(slope = ab2$pred.mean[2],
               intercept = ab2$pred.mean[1],
-              linetype = 2) +
+              linetype = "dotted") +
   geom_point(aes(x = days_since_pulse, y = value,
                  color = "LWP"),
              size = 2) +
@@ -142,7 +149,7 @@ fig4 <- preds |>
                      breaks = seq(0, 21, 3),
                      limits = c(0, 21),
                      guide = "axis_minor") +
-  scale_color_manual(values = c(cols_gn[4], cols_br_gn[1], "coral"),
+  scale_color_manual(values = c(cols_gn[4], cols_br_gn[1], cols_br_gn[1], "coral"),
                      labels = labs) +
   scale_fill_manual(values = cols_div[c(4,1,4)]) +
   theme_bw(base_size = 12) +
@@ -151,13 +158,16 @@ fig4 <- preds |>
         legend.title = element_blank(),
         legend.position = c(0.25, 0.2),
         legend.background = element_blank(),
-        axis.title.y.right = element_text(color = "coral"))+
+        axis.title.y.right = element_text(color = "coral")) +
   guides(fill = "none",
-         color = guide_legend(override.aes = list(shape = c(16, NA, NA),
-                                                  linetype = c(NA, 1, 1))))
+         color = guide_legend(override.aes = list(shape = c(16, NA, NA, NA),
+                                                  linetype = c(NA, 1, 5, 1))))
+
+  
+  
 ggsave(filename = "fig_scripts/fig4.png",
       plot = fig4,
-      height = 3,
+      height = 3.5,
       width = 6,
       units = "in")
 
@@ -179,7 +189,20 @@ swp |>
   pull(SWP_1) |> 
   mean() # -0.92
 
-# As a rule of thumb, we define the threshold as SWP = -1 MPa
+# As a rule of thumb, we define the threshold as SWP_1 = -1 MPa
 # Which in this soil is equivalent to VWC ~= 0.04 cm3/cm3
 
+swp |> 
+  filter(days_since_pulse >= cp_range[1],
+         days_since_pulse <= cp_range[2]) |> 
+  pull(SWP_2) |> 
+  range() # -1.22 to -0.65
+
+swp |> 
+  filter(days_since_pulse >= cp_range[1],
+         days_since_pulse <= cp_range[2]) |> 
+  pull(SWP_2) |> 
+  mean() # -0.57
+
+# As a rule of thumb, we define the threshold as SWP_2 = -0.6 MPa
 
