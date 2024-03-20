@@ -111,7 +111,9 @@ gpp <- read_csv("data/plotgas2023.csv") |>
 gpp_sum <- gpp |>
   group_by(days_since_pulse) |>
   summarize(gpp_m = mean(GPP),
-            gpp_sd = sd(GPP))
+            gpp_sd = sd(GPP),
+            et_m = mean(ET),
+            et_sd = sd(ET))
 
 
 gpp_sum |>
@@ -308,9 +310,40 @@ fig6e <- gpp |>
   theme_bw(base_size = 14) +
   theme(panel.grid = element_blank())
 
+## 6f - ET? ##
+fig6f <- gpp |>
+  ggplot() +
+  geom_rect(data = cps,
+            aes(xmin = pred.lower, xmax = pred.upper,
+                ymin = -Inf, ymax = Inf),
+            color = "gray90", alpha = 0.15) +
+  geom_point(aes(x = days_since_pulse,
+                 y = ET),
+             alpha = 0.25) +
+  geom_errorbar(data = gpp_sum,
+                aes(x = days_since_pulse, 
+                    ymin = et_m - et_sd,
+                    ymax = et_m + et_sd),
+                width = 0) +
+  geom_point(data = gpp_sum,
+             aes(x = days_since_pulse,
+                 y = et_m),
+             size = 2) +
+  geom_line(data = gpp_sum,
+            aes(x = days_since_pulse, 
+                y = et_m)) +
+  geom_vline(data = cps,
+             aes(xintercept = pred.mean),
+             lty = "longdash") +
+  scale_x_continuous("Days since pulse") +
+  scale_y_continuous(expression(paste("ET (mmol ", H[2], O, " ", m^-2, s^-1, ")"))) +
+  guides(color = "none") +
+  theme_bw(base_size = 14) +
+  theme(panel.grid = element_blank())
+
 ##### combine #####
 
-fig6 <- plot_grid(fig6a, fig6b, fig6c, fig6d, fig6e,
+fig6 <- plot_grid(fig6a, fig6b, fig6c, fig6d, fig6e, fig6f,
                   ncol = 2, 
                   align = "v",
                   labels = "auto")
