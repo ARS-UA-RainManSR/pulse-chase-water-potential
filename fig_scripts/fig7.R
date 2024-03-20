@@ -13,8 +13,8 @@ swp <- read_csv("data_clean/swp_daily_daytime.csv") |>
          depth %in% c("0-12 cm", "25 cm")) |>
   mutate(phase = case_when(depth == "0-12 cm" & mean > -1 ~ "Phase 1",
                            depth == "0-12 cm" & mean <= -1 ~ "Phase 2",
-                           depth == "25 cm" & mean > -0.6 ~ "Phase 1",
-                           depth == "25 cm" & mean <= -0.6 ~ "Phase 2")) |>
+                           depth == "25 cm" & mean > -1 ~ "Phase 1",
+                           depth == "25 cm" & mean <= -1 ~ "Phase 2")) |>
   drop_na()
 
 # Calculate days spent in each phase by treatment
