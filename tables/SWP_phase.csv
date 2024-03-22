@@ -1,0 +1,6 @@
+term,estimate,std.error,df,statistic,p.value,sig
+(Intercept),-0.691,0.09,228,-7.709,0,TRUE
+TimeMD,-1.553,0.063,228,-24.736,0,TRUE
+SWP,-0.082,0.137,228,-0.596,0.552,FALSE
+Phase2,0.833,0.188,228,4.427,0,TRUE
+SWP:Phase2,1.151,0.166,228,6.951,0,TRUE

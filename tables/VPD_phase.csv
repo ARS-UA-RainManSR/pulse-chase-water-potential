@@ -1,0 +1,6 @@
+term,estimate,std.error,df,statistic,p.value,sig
+(Intercept),-0.435,0.074,228,-5.862,0,TRUE
+TimeMD,-0.666,0.137,228,-4.864,0,TRUE
+VPD,-0.298,0.042,228,-7.102,0,TRUE
+Phase2,-1.149,0.128,228,-8.952,0,TRUE
+VPD:Phase2,-0.01,0.045,228,-0.226,0.822,FALSE
