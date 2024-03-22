@@ -32,8 +32,8 @@ thresh <- data.frame(depth = c("0-12 cm", "25 cm"),
                      swp_thresh = c(-1, -1)) # should it be the same?
 
 # Make plot
-cols_div <- brewer.pal(7, "Accent")
-display.brewer.pal(7, "Accent")
+cols_div <- brewer.pal(7, "Spectral")
+display.brewer.pal(7, "Spectral")
 
 swp_temp <- swp |>
   mutate(ymin = case_when(depth == "0-12 cm" ~ -1,
@@ -67,8 +67,8 @@ fig7 <- swp |>
                                   "2023-09-04")),
                date_labels = "%b %d") +
   scale_y_continuous(expression(paste(Psi[soil], " (MPa)"))) +
-  scale_color_manual(values = cols_div[c(1,3)]) +
-  scale_fill_manual(values = cols_div[c(1,3)],
+  scale_color_manual(values = cols_div[c(6,3)]) +
+  scale_fill_manual(values = cols_div[c(6,3)],
                     labels = c("Phase 1", "Phase 2")) +
   guides(color = "none") +
   theme_bw(base_size = 14) +
