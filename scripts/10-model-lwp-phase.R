@@ -90,9 +90,10 @@ pairs(EMM2)
 
 # Does the effect of VPD change by phase, depending on time of day?
 mm1 <- lme(value ~ period2 + Dmean*phase, random= ~1|ID, data = wp_all)
-summary(mm1) # R2 = 0.7467
+summary(mm1)
 coef(mm1)
 anova(mm1) # interaction between Dmean:phase is not significant
+glance(mm1)
 # Only use significant parameters
 tm1 <- broom::tidy(mm1) |>
   filter(p.value < 0.05)
@@ -100,9 +101,9 @@ tm1 <- broom::tidy(mm1) |>
 # Does the effect of SWP change by phase, depending on time of day?
 mm2 <- lme(value ~ period2 + SWP_1*phase, random = ~1|ID, data = wp_all)
 summary(mm2)
-# R2 = 0.7802
 coef(mm2)
-anova(mm2) # interaction between Dmean:phase is not significant
+anova(mm2)
+glance(mm2)
 # Only use significant parameters
 tm2 <- broom::tidy(mm2) |>
   filter(p.value < 0.05)
