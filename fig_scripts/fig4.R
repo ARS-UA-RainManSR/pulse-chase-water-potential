@@ -82,11 +82,11 @@ cols_br_gn <- brewer.pal(7, "BrBG")
 display.brewer.pal(7, "BrBG")
 cols_gn <- brewer.pal(4, "Paired")
 display.brewer.pal(4, "Paired")
-cols_div <- brewer.pal(7, "Accent")
-display.brewer.pal(7, "Accent")
+cols_div <- brewer.pal(7, "Spectral")
+display.brewer.pal(7, "Spectral")
 
 # Create labels 
-labs <- c(lapply(c("PD", "0-12 cm", "25"), function(i) bquote(Psi[.(i)])),
+labs <- c(lapply(c("PD", "0-12 cm"), function(i) bquote(Psi[.(i)])),
           lapply(c("PD"), function(i) bquote(VPD[.(i)])))
 
 
@@ -99,16 +99,17 @@ phases <- data.frame(lab = c("", "Phase 1", "Phase 2"),
                      xmean = c(0, mean(cps$pred.mean), 
                                mean(c(cps$pred.mean[2], 21))),
                      ymean = rep(0.5, 3))
+
 fig4 <- preds |> 
   ggplot() +
   geom_line(data = swp, 
             aes(x = days_since_pulse, y = SWP_1,
                 color = "SWP_1"),
             lty = "solid") +
-  geom_line(data = swp, 
-            aes(x = days_since_pulse, y = SWP_2,
-                color = "SWP_2"),
-            lty = "longdash") +
+  # geom_line(data = swp, 
+  #           aes(x = days_since_pulse, y = SWP_2,
+  #               color = "SWP_2"),
+  #           lty = "longdash") +
   geom_line(data = vpd, 
             aes(x = days_since_pulse, y = Dmean-3,
                 color = "VPD")) +
@@ -149,9 +150,9 @@ fig4 <- preds |>
                      breaks = seq(0, 21, 3),
                      limits = c(0, 21),
                      guide = "axis_minor") +
-  scale_color_manual(values = c(cols_gn[4], cols_br_gn[1], cols_br_gn[1], "coral"),
+  scale_color_manual(values = c(cols_gn[4], cols_br_gn[1], "coral"),
                      labels = labs) +
-  scale_fill_manual(values = cols_div[c(4,1,4)]) +
+  scale_fill_manual(values = cols_div[c(3,6,3)]) +
   theme_bw(base_size = 12) +
   theme(ggh4x.axis.ticks.length.minor = rel(1),
         panel.grid = element_blank(),
@@ -160,8 +161,8 @@ fig4 <- preds |>
         legend.background = element_blank(),
         axis.title.y.right = element_text(color = "coral")) +
   guides(fill = "none",
-         color = guide_legend(override.aes = list(shape = c(16, NA, NA, NA),
-                                                  linetype = c(NA, 1, 5, 1))))
+         color = guide_legend(override.aes = list(shape = c(16, NA, NA),
+                                                  linetype = c(NA, 1, 1))))
 
 
 
