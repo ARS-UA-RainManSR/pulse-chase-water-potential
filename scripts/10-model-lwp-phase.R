@@ -98,11 +98,11 @@ tm1 <- broom::tidy(mm1) |>
   filter(p.value < 0.05)
 
 # Does the effect of SWP change by phase, depending on time of day?
-mm2 <- lme(value ~ period2 + SWP_1*phase, random= ~1|ID, data = wp_all)
+mm2 <- lme(value ~ period2 + SWP_1*phase, random = ~1|ID, data = wp_all)
 summary(mm2)
 # R2 = 0.7802
 coef(mm2)
 anova(mm2) # interaction between Dmean:phase is not significant
-
+# Only use significant parameters
 tm2 <- broom::tidy(mm2) |>
   filter(p.value < 0.05)
