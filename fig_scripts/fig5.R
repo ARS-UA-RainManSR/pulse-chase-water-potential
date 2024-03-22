@@ -6,7 +6,6 @@ library(coda)
 library(tidyverse)
 library(broom.mixed)
 library(RColorBrewer)
-library(MASS) # masks dplyr::select
 library(broom)
 library(ggh4x)
 library(cowplot)
@@ -51,127 +50,106 @@ vpd <- read_csv("data_clean/vpd_daily_daytime.csv") |>
                             period == "MD" ~ "midday")) |> 
   rename(Dmean = mean)
 
-# Combine
+vwc <- read_csv("data_clean/vwc_daily_daytime.csv") |>
+  filter(period == "morn",
+         date >= min(wp$date_col),
+         date <= max(wp$date_col),
+         depth == "0-12 cm",
+         summer != "S3") |> 
+  rename(trt_s = summer,
+         VWC_1 = mean) |> 
+  dplyr::select(-period, -sd, -depth)
+
+# Combine data and classify into phases
 wp_all <- wp |> 
   left_join(swp, by = join_by(date_col == date,
                               trt_s)) |> 
-  left_join(vpd, by = join_by(date_col == date, 
-                              period))
-
-# Determine phase by filtering for above and below SWP = -1 MPa 
-# then rejoin
-p1 <- wp_all |> 
-  filter(SWP_1 >= -1) |> 
-  mutate(phase = "Phase 1")
-p2 <- wp_all |> 
-  filter(SWP_1 < -1) |> 
-  mutate(phase = "Phase 2")
-
-wp_phase <- bind_rows(p1, p2) |> 
-  mutate(period2 = case_when(period == "predawn" ~ "PD",
+  left_join(vpd, by = join_by(date_col == date,
+                              period)) |>
+  left_join(vwc, by = join_by(date_col == date,
+                              trt_s)) |>
+  mutate(phase = case_when(SWP_1 >= -1 ~ "Phase 1",
+                           SWP_1 < -1 ~ "Phase 2"),
+         period2 = case_when(period == "predawn" ~ "PD",
                              period == "midday" ~ "MD") |> 
-           factor(levels = c("PD", "MD")))
-
-#### Test lms with model comparison ####
-
-# Used backward selection with AIC as guidance
-# 3 out of 4 models used the additive model 
-# (different ints but same slope)
-# So use for all 4 panels?
-
-m1_start <- lm(value ~ Dmean*period2, data = wp_phase |> 
-           filter(phase == "Phase 1"))
-m1_step <- stepAIC(m1_start, scope = list(lower = ~period2),
-                   direction = "backward",
-                   trace = 2)
-m1_step$anova
-m1 <- lm(value ~ Dmean + period2, data = wp_phase |> 
-           filter(phase == "Phase 1"))
-summary(m1) # all 3 are significant
-cf1 <- coef(m1)
-
-m2_start <- lm(value ~ Dmean*period2, data = wp_phase |> 
-           filter(phase == "Phase 2"))
-m2_step <- stepAIC(m2_start, scope = list(lower = ~period2),
-                   direction = "backward",
-                   trace = 2)
-m2_step$anova
-m2 <- lm(value ~ Dmean + period2, data = wp_phase |> 
-           filter(phase == "Phase 2"))
-
-summary(m2) # only single intercept + Dmean slope
-cf2 <- coef(m2)
-
-cf_D <- data.frame(period2 = rep(c("PD", "MD"), 2),
-           phase = rep(c("Phase 1", "Phase 2"), each = 2),
-           int = c(cf1[1], cf1[1] + cf1[3], cf2[1], cf2[1]),
-           slope = c(cf1[2], cf1[2], cf2[2], cf2[2])) |> 
-  mutate(period2 = factor(period2, levels = c("PD", "MD")))
+           factor(levels = c("PD", "MD")),
+         Time = period2,
+         Phase = case_when(phase == "Phase 1" ~ "1",
+                           phase == "Phase 2" ~ "2"),
+         VPD = Dmean,
+         SWP = SWP_1)
 
 
+#### Test models ####
 
-m3_start <- lm(value ~ SWP_1*period2, data = wp_phase |> 
-           filter(phase == "Phase 1"))
-m3_step <- stepAIC(m3_start, scope = list(lower = ~period2),
-                   direction = "backward",
-                   trace = 1)
-m3_step$anova
-m3 <- lm(value ~ SWP_1 + period2, data = wp_phase |> 
-                 filter(phase == "Phase 1"))
-summary(m3)
-cf3 <- coef(m3)
+# Does the effect of VPD change by phase, depending on time of day?
+mm1 <- lme(value ~ Time + VPD*Phase, random= ~1|ID, data = wp_all)
+summary(mm1) # R2 = 0.7467
+coef(mm1)
+anova(mm1) # interaction between Dmean:phase is not significant
+# Only use significant parameters
+tm1 <- broom::tidy(mm1) |>
+  filter(p.value < 0.05)
 
-m4_start <- lm(value ~ SWP_1*period2, data = wp_phase |> 
-           filter(phase == "Phase 2"))
-m4_step <- stepAIC(m4_start, scope = list(lower = ~period2),
-                   direction = "backward",
-                   trace = 2)
-m4_step$anova
-m4 <- lm(value ~ SWP_1 + period2, data = wp_phase |> 
-                 filter(phase == "Phase 2"))
-summary(m4) # intercept not significant
-cf4 <- coef(m4)
+params1 <- data.frame(period2 = rep(c("PD", "MD"), 2),
+                      phase = rep(c("Phase 1", "Phase 2"), each = 2),
+                      ints = c(tm1$estimate[1],
+                               tm1$estimate[1] + tm1$estimate[2],
+                               tm1$estimate[1] + tm1$estimate[4],
+                               tm1$estimate[1] + tm1$estimate[2] + tm1$estimate[4]),
+                      slopes = rep(tm1$estimate[3], 4))
 
-cf_SWP <- data.frame(period2 = rep(c("PD", "MD"), 2),
-                   phase = rep(c("Phase 1", "Phase 2"), each = 2),
-                   int = c(cf3[1], cf3[1] + cf3[3], 0, 0 + cf4[3]),
-                   slope = c(0, 0, cf4[2], cf4[2])) |> 
-  mutate(period2 = factor(period2, levels = c("PD", "MD")))
+lab1 <- params1 |>
+  group_by(phase) |>
+  summarize(slope = unique(slopes)) |>
+  mutate(label = paste0("Slope: ", 
+                     round(slope, 3)))
 
-# Model comparison 
+# Does the effect of SWP change by phase, depending on time of day?
+mm2 <- lme(value ~ Time + SWP*Phase, random = ~1|ID, data = wp_all)
+summary(mm2)
+# R2 = 0.7802
+coef(mm2)
+anova(mm2) # interaction between Dmean:phase is not significant
+# Only use significant parameters
+tm2 <- broom::tidy(mm2) |>
+  filter(p.value < 0.05)
 
-mc_D <- broom::glance(m1) |> 
-  bind_rows(broom::glance(m2)) |> 
-  mutate(phase = c("Phase 1", "Phase 2"),
-         r2 = paste0("italic(R^2) == ", 
-                     round(adj.r.squared, 3)))
+params2 <- data.frame(period2 = rep(c("PD", "MD"), 2),
+                      phase = rep(c("Phase 1", "Phase 2"), each = 2),
+                      ints = c(tm2$estimate[1],
+                               tm2$estimate[1] + tm2$estimate[2],
+                               tm2$estimate[1] + tm2$estimate[3],
+                               tm2$estimate[1] + tm2$estimate[2] + tm2$estimate[3]),
+                      slopes = c(0, 0,
+                                 rep(tm2$estimate[4], 2)))
 
-mc_SWP <- broom::glance(m3) |> 
-  bind_rows(broom::glance(m4)) |> 
-  mutate(phase = c("Phase 1", "Phase 2"),
-         r2 = paste0("italic(R^2) == ", 
-                     round(adj.r.squared, 3)))
-
+lab2 <- params2 |>
+  group_by(phase) |>
+  summarize(slope = unique(slopes)) |>
+  mutate(label = paste0("Slope: ", 
+                        round(slope, 3)))
 
 #### Assemble panels ####
 
 cols_gn <- brewer.pal(4, "Paired")
 display.brewer.pal(4, "Paired")
 
-cols_div <- brewer.pal(7, "Accent")
-display.brewer.pal(7, "Accent")
+cols_div <- brewer.pal(7, "Spectral")
+display.brewer.pal(7, "Spectral")
 
 labs <- c(lapply(c("PD", "MD"), function(i) bquote(Psi[.(i)])))
-strip <- strip_themed(background_x = elem_list_rect(fill = cols_div[c(1,4)]))
+strip <- strip_themed(background_x = elem_list_rect(fill = cols_div[c(6,3)]))
 
-fig5a <- wp_phase |> 
+fig5a <-
+  wp_all |> 
   ggplot() +
   geom_point(aes(x = Dmean, y = value, color = period2)) +
-  geom_abline(data = cf_D,
-              aes(slope = slope, intercept = int,
+  geom_abline(data = params1,
+              aes(slope = slopes, intercept = ints,
                   color = period2)) +
-  geom_text(data = mc_D,
-            aes(x = -1, y = -5.5, label = r2),
+  geom_text(data = lab1,
+            aes(x = -1, y = -5.5, label = label),
             parse = TRUE,
             hjust = 0) +
   scale_y_continuous(expression(paste(Psi[leaf], " (MPa)"))) +
@@ -187,16 +165,17 @@ fig5a <- wp_phase |>
         legend.background = element_blank()) +
   guides(color = guide_legend(override.aes = list(linetype = c(0, 0))))
 
-fig5b <- wp_phase |> 
+fig5b <-
+  wp_all |> 
   ggplot() +
   geom_point(aes(x = SWP_1, y = value, color = period2)) +
-  geom_abline(data = cf_SWP,
-              aes(slope = slope, intercept = int,
+  geom_abline(data = params2,
+              aes(slope = slopes, intercept = ints,
                   color = period2)) +
-  geom_text(data = mc_SWP,
-            aes(x = c(-1, -2), y = -5.5, label = r2),
+  geom_text(data = lab2,
+            aes(x = c(0, -1), y = -5.5, label = label),
             parse = TRUE,
-            hjust = 0) +
+            hjust = 1) +
   scale_y_continuous(expression(paste(Psi[leaf], " (MPa)"))) +
   scale_x_continuous(expression(paste(Psi[soil], " (MPa)"))) +
   scale_color_manual(values = cols_gn[4:3]) +
@@ -217,4 +196,102 @@ ggsave(filename = "fig_scripts/fig5.png",
        height = 4.5,
        width = 6,
        units = "in")
+
+
+#### Output tables ####
+
+tidy(mm1) |>
+  filter(effect == "fixed") |>
+  select(-effect, -group) |>
+  mutate(across(estimate:p.value, ~round(.x, 3)),
+                sig = ifelse(p.value < 0.05, TRUE, FALSE)) |>
+  write_csv(file = "tables/VPD_phase.csv")
+
+tidy(mm2) |>
+  filter(effect == "fixed") |>
+  select(-effect, -group) |>
+  mutate(across(estimate:p.value, ~round(.x, 3)),
+         sig = ifelse(p.value < 0.05, TRUE, FALSE)) |>
+  write_csv(file = "tables/SWP_phase.csv")
+
+
+#### Test lms with model comparison (OLD) ####
+
+# Used backward selection with AIC as guidance
+# 3 out of 4 models used the additive model 
+# (different ints but same slope)
+# So use for all 4 panels?
+
+m1_start <- lm(value ~ Dmean*period2, data = wp_phase |> 
+                 filter(phase == "Phase 1"))
+m1_step <- stepAIC(m1_start, scope = list(lower = ~period2),
+                   direction = "backward",
+                   trace = 2)
+m1_step$anova
+m1 <- lm(value ~ Dmean + period2, data = wp_phase |> 
+           filter(phase == "Phase 1"))
+summary(m1) # all 3 are significant
+cf1 <- coef(m1)
+
+m2_start <- lm(value ~ Dmean*period2, data = wp_phase |> 
+                 filter(phase == "Phase 2"))
+m2_step <- stepAIC(m2_start, scope = list(lower = ~period2),
+                   direction = "backward",
+                   trace = 2)
+m2_step$anova
+m2 <- lm(value ~ Dmean + period2, data = wp_phase |> 
+           filter(phase == "Phase 2"))
+
+summary(m2) # only single intercept + Dmean slope
+cf2 <- coef(m2)
+
+cf_D <- data.frame(period2 = rep(c("PD", "MD"), 2),
+                   phase = rep(c("Phase 1", "Phase 2"), each = 2),
+                   int = c(cf1[1], cf1[1] + cf1[3], cf2[1], cf2[1]),
+                   slope = c(cf1[2], cf1[2], cf2[2], cf2[2])) |> 
+  mutate(period2 = factor(period2, levels = c("PD", "MD")))
+
+
+
+m3_start <- lm(value ~ SWP_1*period2, data = wp_phase |> 
+                 filter(phase == "Phase 1"))
+m3_step <- stepAIC(m3_start, scope = list(lower = ~period2),
+                   direction = "backward",
+                   trace = 1)
+m3_step$anova
+m3 <- lm(value ~ SWP_1 + period2, data = wp_phase |> 
+           filter(phase == "Phase 1"))
+summary(m3)
+cf3 <- coef(m3)
+
+m4_start <- lm(value ~ SWP_1*period2, data = wp_phase |> 
+                 filter(phase == "Phase 2"))
+m4_step <- stepAIC(m4_start, scope = list(lower = ~period2),
+                   direction = "backward",
+                   trace = 2)
+m4_step$anova
+m4 <- lm(value ~ SWP_1 + period2, data = wp_phase |> 
+           filter(phase == "Phase 2"))
+summary(m4) # intercept not significant
+cf4 <- coef(m4)
+
+cf_SWP <- data.frame(period2 = rep(c("PD", "MD"), 2),
+                     phase = rep(c("Phase 1", "Phase 2"), each = 2),
+                     int = c(cf3[1], cf3[1] + cf3[3], 0, 0 + cf4[3]),
+                     slope = c(0, 0, cf4[2], cf4[2])) |> 
+  mutate(period2 = factor(period2, levels = c("PD", "MD")))
+
+# Model comparison 
+
+mc_D <- broom::glance(m1) |> 
+  bind_rows(broom::glance(m2)) |> 
+  mutate(phase = c("Phase 1", "Phase 2"),
+         r2 = paste0("italic(R^2) == ", 
+                     round(adj.r.squared, 3)))
+
+mc_SWP <- broom::glance(m3) |> 
+  bind_rows(broom::glance(m4)) |> 
+  mutate(phase = c("Phase 1", "Phase 2"),
+         r2 = paste0("italic(R^2) == ", 
+                     round(adj.r.squared, 3)))
 
