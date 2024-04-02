@@ -83,13 +83,16 @@ wp_all <- wp |>
 #### Test models ####
 
 # Does the effect of VPD change by phase, depending on time of day?
+mr1 <- lme4::lmer(value ~ period2 + Dmean*phase + (1|ID), data = wp_all)
+summary(mr1)
+coef(mr1)
 mm1 <- lme(value ~ Time + VPD*Phase, random= ~1|ID, data = wp_all)
-summary(mm1) # R2 = 0.7467
+summary(mm1) # 
 coef(mm1)
 anova(mm1) # interaction between Dmean:phase is not significant
 # Only use significant parameters
 tm1 <- broom::tidy(mm1) |>
-  filter(p.value < 0.05)
+  filter(effect == "fixed")
 
 params1 <- data.frame(period2 = rep(c("PD", "MD"), 2),
                       phase = rep(c("Phase 1", "Phase 2"), each = 2),
@@ -97,7 +100,9 @@ params1 <- data.frame(period2 = rep(c("PD", "MD"), 2),
                                tm1$estimate[1] + tm1$estimate[2],
                                tm1$estimate[1] + tm1$estimate[4],
                                tm1$estimate[1] + tm1$estimate[2] + tm1$estimate[4]),
-                      slopes = rep(tm1$estimate[3], 4))
+                      slopes = rep(c(tm1$estimate[3], 
+                                     tm1$estimate[3] + tm1$estimate[5]), each = 2),
+                      sig = c(T, T, T, T))
 
 lab1 <- params1 |>
   group_by(phase) |>
@@ -106,29 +111,31 @@ lab1 <- params1 |>
                      round(slope, 3)))
 
 # Does the effect of SWP change by phase, depending on time of day?
+mr2 <- lme4::lmer(value ~ period2 + SWP_1*phase + (1|ID), data = wp_all)
+summary(mr2)
 mm2 <- lme(value ~ Time + SWP*Phase, random = ~1|ID, data = wp_all)
 summary(mm2)
-# R2 = 0.7802
 coef(mm2)
 anova(mm2) # interaction between Dmean:phase is not significant
 # Only use significant parameters
 tm2 <- broom::tidy(mm2) |>
-  filter(p.value < 0.05)
+  filter(effect == "fixed")
 
 params2 <- data.frame(period2 = rep(c("PD", "MD"), 2),
                       phase = rep(c("Phase 1", "Phase 2"), each = 2),
                       ints = c(tm2$estimate[1],
                                tm2$estimate[1] + tm2$estimate[2],
-                               tm2$estimate[1] + tm2$estimate[3],
-                               tm2$estimate[1] + tm2$estimate[2] + tm2$estimate[3]),
-                      slopes = c(0, 0,
-                                 rep(tm2$estimate[4], 2)))
+                               tm2$estimate[1] + tm2$estimate[4],
+                               tm2$estimate[1] + tm2$estimate[2] + tm2$estimate[4]),
+                      slopes = rep(c(tm2$estimate[3],
+                                     tm2$estimate[3] + tm2$estimate[5]), each = 2),
+                      sig = c(F, F, T, T))
 
 lab2 <- params2 |>
-  group_by(phase) |>
+  group_by(phase, sig) |>
   summarize(slope = unique(slopes)) |>
-  mutate(label = paste0("Slope: ", 
-                        round(slope, 3)))
+  mutate(label = case_when(sig == TRUE ~ paste0("Slope: ", round(slope, 3)),
+                           sig == FALSE ~ ""))
 
 #### Assemble panels ####
 
@@ -171,7 +178,8 @@ fig5b <-
   geom_point(aes(x = SWP_1, y = value, color = period2)) +
   geom_abline(data = params2,
               aes(slope = slopes, intercept = ints,
-                  color = period2)) +
+                  color = period2,
+                  lty = sig)) +
   geom_text(data = lab2,
             aes(x = c(0, -1), y = -5.5, label = label),
             parse = TRUE,
@@ -179,12 +187,14 @@ fig5b <-
   scale_y_continuous(expression(paste(Psi[leaf], " (MPa)"))) +
   scale_x_continuous(expression(paste(Psi[soil], " (MPa)"))) +
   scale_color_manual(values = cols_gn[4:3]) +
+  scale_linetype_manual(values = c("dashed", "solid")) +  
   facet_wrap2(~phase, strip = strip,
               scales = "free_x") +
   theme_bw(base_size = 14) +
   theme(panel.grid = element_blank(),
         legend.title = element_blank()) +
-  guides(color = "none")
+  guides(color = "none",
+         linetype = "none")
 
 fig5 <- plot_grid(fig5a, fig5b, 
           ncol = 1,
