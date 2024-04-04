@@ -14,7 +14,11 @@ both <- read_csv("data_clean/wp_rwc_long.csv") |>
 
 # Separate wp and rwc
 wp <- both |> 
-  filter(variable == "WP")
+  filter(variable == "WP")|> 
+  mutate(trt_label = case_when(trt_s == "S1" ~ "P3.5",
+                               trt_s == "S2" ~ "P7",
+                               trt_s == "S4" ~ "P21") |>
+           factor(levels = c("P3.5", "P7", "P21")))
 
 rwc <- both |> 
   filter(variable == "RWC")
@@ -84,8 +88,7 @@ vwc <- read_csv("data_clean/vwc_daily_daytime.csv") |>
 ####  A) LWP + SWP ####
 
 labs <- c(lapply(c("PD", "MD"), function(i) bquote(Psi[.(i)])),
-          lapply(c("soil"), function(i) bquote(Psi[.(i)])),
-          lapply(c(""), function(i) bquote(Theta[.(i)])))
+          lapply(c("0-12 cm", "25 cm"), function(i) bquote(Psi[.(i)])))
 
 cols_br_gn <- brewer.pal(7, "BrBG")
 display.brewer.pal(7, "BrBG")
@@ -120,17 +123,9 @@ figa <-
   geom_line(data = swp,
             aes(x = date,
                 y = mean,
-                color = "SWP",
+                color = depth,
                 lty = depth)) +
-  geom_line(data = vwc,
-            aes(x = date,
-                y = mean*20-5,
-                color = "VWC",
-                lty = depth)) +
-  scale_y_continuous(expression(paste(Psi, " (MPa)")),
-                     sec.axis = sec_axis(~(.+5)/20,
-                                         name = expression(paste(Theta, " (", cm^3, cm^-3, ")")),
-                                         breaks = seq(0, 0.15, 0.05))) +
+  scale_y_continuous(expression(paste(Psi, " (MPa)"))) +
   facet_wrap(~trt_label,
              nrow = 1) +
   scale_x_date(date_labels = "%b %d",
@@ -138,8 +133,8 @@ figa <-
                             as.Date("2023-09-03"), 
                             by = 7)) +
   scale_color_manual(values = c(rev(RColorBrewer::brewer.pal(4, "Paired"))[1:2], 
-                                cols_br_gn[1], cols_br_gn[2]),
-                     breaks = c("PD", "MD", "SWP", "VWC"),
+                                cols_br_gn[1], cols_br_gn[1]),
+                     breaks = c("PD", "MD", "0-12 cm", "25 cm"),
                      labels = labs) +
   scale_linetype_manual(values = c("solid", "dashed")) +
   theme_bw(base_size = 14) +
@@ -147,11 +142,13 @@ figa <-
         panel.grid = element_blank(),
         strip.background = element_blank(),
         legend.title = element_blank(),
-        legend.position = c(0.2, 0.1),
+        legend.position = c(0.2, 0.15),
         legend.text = element_text(size = 8),
         legend.background = element_rect(fill = NA)) +
   guides(linetype = "none",
-         color = guide_legend(keyheight = 0.4))
+         # color = guide_legend(keyheight = 0.4),
+         color = guide_legend(override.aes = list(shape = c(16, 16, NA, NA),
+                                                  linetype = c(1, 1, 1, 2))))
   
   ggsave(filename = "fig_scripts/egu_talk/fig3.png",
        plot = figa,
