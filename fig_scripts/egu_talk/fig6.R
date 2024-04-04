@@ -201,7 +201,7 @@ fig6b <- rwc |>
              aes(xintercept = pred.mean),
              lty = "longdash") +
   scale_x_continuous("Days since pulse") +
-  scale_y_continuous(expression(paste("RWC (g ", g^-1, ")"))) +
+  scale_y_continuous(expression(paste(RWC[leaf], " (g ", g^-1, ")"))) +
   scale_color_manual(values = cols_gn[c(4,3)]) +
   guides(color = "none") +
   theme_bw(base_size = 12) +

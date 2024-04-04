@@ -27,6 +27,24 @@ num_text <- swp |>
                        depth == "25 cm" & phase == "Phase 1" ~ -2,
                        depth == "25 cm" & phase == "Phase 2" ~ -2.5))
 
+# Calculate total days in each phase, regardless of depth
+num_total <- swp |>
+  select(-period, -mean, -sd) |>
+  pivot_wider(names_from = depth, 
+              values_from = phase) |>
+  mutate(phase_total = ifelse(`0-12 cm` == "Phase 1" | `25 cm` == "Phase 1",
+                              "Phase 1", "Phase 2")) |>
+  group_by(summer) |>
+  count(phase_total)
+  ungroup() |>
+  group_by(summer) |>
+  summarize(total_phase = sum(total))
+  mutate(lab = paste0(n, " days"),
+         y = case_when(depth == "0-12 cm" & phase == "Phase 1" ~ -4.5,
+                       depth == "0-12 cm" & phase == "Phase 2" ~ -5,
+                       depth == "25 cm" & phase == "Phase 1" ~ -2,
+                       depth == "25 cm" & phase == "Phase 2" ~ -2.5))
+
 # Establish SWP thresholds by depth
 thresh <- data.frame(depth = c("0-12 cm", "25 cm"),
                      swp_thresh = c(-1, -1)) # should it be the same?
