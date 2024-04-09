@@ -20,6 +20,42 @@ calc_VI <- function(df, a, b, c, d){
   ((rowMeans(df_wide[b1_1:b1_2]) - rowMeans(df_wide[b2_1:b2_2])) /      #vegetation index equation
       (rowMeans(df_wide[b1_1:b1_2]) + rowMeans(df_wide[b2_1:b2_2])))
 }
+#Calculates difference ratio using (a:b - c:d) / (c:d)
+calc_diffR <- function(df, a, b, c, d){
+  b1_1 <- which.min(abs(a - as.numeric(names(df), options(warn=-1))))   #Identify first band and start range
+  b1_2 <- which.min(abs(b - as.numeric(names(df), options(warn=-1))))   #Identify first band and end range
+  b2_1 <- which.min(abs(c - as.numeric(names(df), options(warn=-1))))   #Identify second band and start range
+  b2_2 <- which.min(abs(d - as.numeric(names(df), options(warn=-1))))   #Identify second band and end range
+  ((rowMeans(df_wide[b1_1:b1_2]) - rowMeans(df_wide[b2_1:b2_2])) /      #vegetation index equation
+      (rowMeans(df_wide[b2_1:b2_2])))
+}
+#Calculates additive ratio using (a:b + c:d) / (c:d + e:f)
+calc_addR <- function(df, a, b, c, d, e, f){
+  b1_1 <- which.min(abs(a - as.numeric(names(df), options(warn=-1))))   #Identify first band and start range
+  b1_2 <- which.min(abs(b - as.numeric(names(df), options(warn=-1))))   #Identify first band and end range
+  b2_1 <- which.min(abs(c - as.numeric(names(df), options(warn=-1))))   #Identify second band and start range
+  b2_2 <- which.min(abs(d - as.numeric(names(df), options(warn=-1))))   #Identify second band and end range
+  b3_1 <- which.min(abs(d - as.numeric(names(df), options(warn=-1))))   #Identify third band and end range
+  b3_2 <- which.min(abs(d - as.numeric(names(df), options(warn=-1))))   #Identify third band and end range
+  ((rowMeans(df_wide[b1_1:b1_2]) + rowMeans(df_wide[b2_1:b2_2])) /      #vegetation index equation
+      (rowMeans(df_wide[b2_1:b2_2]) + rowMeans(df_wide[b3_1:b3_2])))
+}
+#Calculates complex using (a:b) / (c:d + e:f + g:h + i:j)
+calc_complex <- function(df, a, b, c, d, e, f, g, h, i, j){
+  b1_1 <- which.min(abs(a - as.numeric(names(df), options(warn=-1))))   #Identify first band and start range
+  b1_2 <- which.min(abs(b - as.numeric(names(df), options(warn=-1))))   #Identify first band and end range
+  b2_1 <- which.min(abs(c - as.numeric(names(df), options(warn=-1))))   #Identify second band and start range
+  b2_2 <- which.min(abs(d - as.numeric(names(df), options(warn=-1))))   #Identify second band and end range
+  b3_1 <- which.min(abs(d - as.numeric(names(df), options(warn=-1))))   #Identify third band and end range
+  b3_2 <- which.min(abs(d - as.numeric(names(df), options(warn=-1))))   #Identify third band and end range
+  b4_1 <- which.min(abs(d - as.numeric(names(df), options(warn=-1))))   #Identify fourth band and end range
+  b4_2 <- which.min(abs(d - as.numeric(names(df), options(warn=-1))))   #Identify fourth band and end range
+  b5_1 <- which.min(abs(d - as.numeric(names(df), options(warn=-1))))   #Identify fifth band and end range
+  b5_2 <- which.min(abs(d - as.numeric(names(df), options(warn=-1))))   #Identify fifth band and end range
+  ((rowMeans(df_wide[b1_1:b1_2])) /      #vegetation index equation
+      (rowMeans(df_wide[b2_1:b2_2]) + rowMeans(df_wide[b3_1:b3_2]) + 
+         rowMeans(df_wide[b4_1:b4_2]) + rowMeans(df_wide[b5_1:b5_2])))
+}
 ################################################################################
 #Location of all the raw .sig files
 folders <- c('08_14','08_15','08_16','08_18','08_21','08_22','08_23','08_26','08_30','09_04')
@@ -153,7 +189,30 @@ for(i in 1:length(dates)){
   df_wide$NDWI3 <- calc_VI(df_wide, 860, 860, 2130, 2130)
   
   #PRI
+  # Penuelas et al. 1995
   df_wide$PRI <- calc_VI(df_wide, 531, 531, 570, 570) #literature derived PRI bands
+  
+  # From Caine et al. 2024 PCE
+  
+  # WBI - water band index
+  # Penuelas et al. 1993, R970/R900
+  df_wide$WBI <- calc_SR(df_wide, 970, 970, 900, 900)
+  
+  # WP1 - water potential index 1
+  # Mertens et al. 2021, (R665 - R715)/R715
+  df_wide$WPI1 <- calc_diffR(df_wide, 660, 670, 710, 720)
+  
+  # WP2 - water potential index 2
+  # Mertens et al. 2021, (R665 + R1457)/(R715 + R1457)
+  df_wide$WPI2 <- calc_addR(df_wide, 660, 670, 1457, 1457, 710, 720)
+  
+  # RWC - relative water content index
+  # Yu et al. 2000, R1430/R1850
+  df_wide$RWC_ind <- calc_SR(df_wide, 1430, 1430, 1850, 1850)
+  
+  # CNDI - combined nitrogen and drought index
+  # Cainet al. 2024, R1353/(R706 + R1402 + R1451 + R1878)
+  df_wide$CNDI <- calc_complex(df_wide, 1353, 1353, 706, 706, 1402, 1402, 1451, 1451, 1878, 1878)
   
   #write csv file
   out <- cbind.data.frame(date_id,
@@ -163,11 +222,19 @@ for(i in 1:length(dates)){
                           df_wide$NDVI, df_wide$CI1, df_wide$CI2, 
                           df_wide$NDWI1, df_wide$NDWI2, df_wide$NDWI3, 
                           df_wide$WI1, df_wide$WI2, df_wide$WI3, 
-                          df_wide$PRI, wp_id, rwc_id)
+                          df_wide$PRI, df_wide$WBI, # from Penuelas et al. 1993, 1995
+                          df_wide$WPI1, df_wide$WPI2, # from Mertens et al. 2021
+                          df_wide$RWC_ind, # from Yu et al. 2000
+                          df_wide$CNDI, # from Caine et al. 2024
+                          wp_id, rwc_id)
   
-  colnames(out) <- c("Date", 'ID', 'House', 'Plot', 'Treat', 'Winter', 'Summer', 'Time',
+  colnames(out) <- c('Date', 'ID', 'House', 'Plot', 'Treat', 'Winter', 'Summer', 'Time',
                    'NDVI', 'CI1', 'CI2', 'NDWI1', 'NDWI2', 'NDWI3', 'WI1', 'WI2', 'WI3',
-                   'PRI', 'WP', 'RWC')
+                   'PRI', 'WBI',
+                   'WPI1', 'WPI2',
+                   'RWC_ind',
+                   'CNDI',
+                   'WP', 'RWC')
   
   write_csv(out, paste0('data/hyperspec_1/Indices_Rep1_',folders[i],".csv"))
   print(dates[i])
@@ -185,7 +252,7 @@ for(i in 1:length(fn)){
                    locale = locale(tz = "America/Phoenix")) 
   to_merge[[i]] <- temp
 }
-colnames(merged)
+
 merged <- do.call(rbind, to_merge) |> 
   rename(date_col = Date,
          ID_long = ID,
@@ -195,7 +262,7 @@ merged <- do.call(rbind, to_merge) |>
          house = str_extract(house, "[0-9]+"),
          plot = str_extract(plot, "[0-9]+")) |> 
   select(-WP, -RWC)
-  
+colnames(merged)
 # find duplicates
 dups <- merged |> 
   group_by(date_col, period, trt_s, ID) |> 
@@ -203,7 +270,7 @@ dups <- merged |>
   filter(n > 1) |> 
   select(-n) |> 
   inner_join(merged) |> 
-  slice(1,3) # remove the first of each measurement
+  slice(1,3) # keep the first of each measurement, which are removed in the next step
 
 # remove duplicates
 out <- merged |> 
