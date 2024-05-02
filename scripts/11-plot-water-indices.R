@@ -1,8 +1,7 @@
-# Create figure of new water indices
-library(tidyverse)
-
+# Create figures of new water indices
 library(tidyverse)
 library(cowplot)
+
 # library(ggpubr)
 
 # load data files
@@ -358,10 +357,11 @@ figS5 <- plot_grid(fig1, fig2, fig3, fig4,
 
 # Calculate means and add to existing bivariate plots
 hyp_long_sum <- hyp_long |>
-  group_by(trt_s, period2, date_col, variable) |>
+  group_by(trt_s, pulse_num2, period2, date_col, variable) |>
   summarize(var_m = mean(value, na.rm = TRUE),
             var_sd = sd(value, na.rm = TRUE)) |>
-  left_join(hyp_sum, by = join_by("date_col", "period2", "trt_s"))
+  left_join(hyp_sum, by = join_by("date_col", "period2", "trt_s", 
+                                  "pulse_num2"))
 
 
 # fig1 <- 
@@ -473,6 +473,9 @@ hyp_long |>
 fig_1 <- hyp_long |>
   filter(trt_s == "S4") |>
   ggplot() +
+  geom_vline(data = irig |> filter(trt_s == "S4"),
+             aes(xintercept = date),
+             lty = "dotted")  +
   geom_point(aes(x = date_col, y = value,
                  color = period2),
              alpha = 0.25) +
@@ -505,23 +508,28 @@ fig_1 <- hyp_long |>
   guides(color = "none")
 
 # Make long version of only WBI and RWC_ind
-sub_long <- hyp_ind |>
-  select(1:8, ID, WBI, RWC_ind) |>
+sub_long <- hyp |>
+  select(1:17, ID, WBI, RWC_ind, pulse_num2) |>
+  relocate(pulse_num2, .before = pulse_num) |>
   mutate(period2 = case_when(period == "predawn" ~ "PD",
                              period == "midday" ~ "MD") |> 
            factor(levels = c("PD", "MD"))) |>
+  select(-value, -variable) |>
   pivot_longer(WBI:RWC_ind, 
                names_to = "variable",
                values_to = "value")
 
 sub_long_sum <- sub_long |>
-  group_by(date_col, trt_s, period2, variable) |>
+  group_by(date_col, pulse_num2, trt_s, period2, variable) |>
   summarize(var_m = mean(value, na.rm = TRUE),
             var_sd = sd(value, na.rm = TRUE))
 
 fig_2 <- sub_long |>
   filter(trt_s == "S4") |>
   ggplot() +
+  geom_vline(data = irig |> filter(trt_s == "S4"),
+             aes(xintercept = date),
+             lty = "dotted")  +
   geom_point(aes(x = date_col, y = value,
                  color = period2),
              alpha = 0.25) +
@@ -559,12 +567,15 @@ plot_grid(fig_1, fig_2,
           align = "v",
           labels = "auto")
 
-# S4- only 
+# S2- only 
 # compare LWP, RWC, WBI, and RWC_ind
 
 fig_3 <- hyp_long |>
   filter(trt_s == "S2") |>
   ggplot() +
+  geom_vline(data = irig |> filter(trt_s == "S2"),
+             aes(xintercept = date),
+             lty = "dotted")  +
   geom_point(aes(x = date_col, y = value,
                  color = period2),
              alpha = 0.25) +
@@ -582,7 +593,8 @@ fig_3 <- hyp_long |>
   geom_line(data = hyp_long_sum |>
               filter(trt_s == "S2"),
             aes(x = date_col, y = var_m,
-                color= period2)) +
+                color= period2,
+                group = interaction(pulse_num2, period2))) +
   facet_wrap(~variable,
              ncol = 1,
              scales = "free_y",
@@ -600,6 +612,9 @@ fig_3 <- hyp_long |>
 fig_4 <- sub_long |>
   filter(trt_s == "S2") |>
   ggplot() +
+  geom_vline(data = irig |> filter(trt_s == "S2"),
+             aes(xintercept = date),
+             lty = "dotted")  +
   geom_point(aes(x = date_col, y = value,
                  color = period2),
              alpha = 0.25) +
@@ -617,7 +632,8 @@ fig_4 <- sub_long |>
   geom_line(data = sub_long_sum |>
               filter(trt_s == "S2"),
             aes(x = date_col, y = var_m,
-                color= period2)) +
+                color= period2,
+                group = interaction(pulse_num2, period2))) +
   scale_y_reverse() +
   scale_x_date() +
   scale_color_manual(values = RColorBrewer::brewer.pal(4, "Paired")[4:3]) +
@@ -636,3 +652,90 @@ plot_grid(fig_3, fig_4,
           ncol = 2,
           align = "v",
           labels = "auto")
+
+# S1- only 
+# compare LWP, RWC, WBI, and RWC_ind
+
+fig_5 <- hyp_long |>
+  filter(trt_s == "S1") |>
+  ggplot() +
+  geom_vline(data = irig |> filter(trt_s == "S1"),
+             aes(xintercept = date),
+             lty = "dotted")  +
+  geom_point(aes(x = date_col, y = value,
+                 color = period2),
+             alpha = 0.25) +
+  geom_errorbar(data = hyp_long_sum |>
+                  filter(trt_s == "S1"),
+                aes(x = date_col, 
+                    ymin = var_m - var_sd, ymax = var_m + var_sd,
+                    color= period2),
+                width = 0) +
+  geom_point(data = hyp_long_sum |>
+               filter(trt_s == "S1"),
+             aes(x = date_col, y = var_m,
+                 color= period2),
+             size = 2) +
+  geom_line(data = hyp_long_sum |>
+              filter(trt_s == "S1"),
+            aes(x = date_col, y = var_m,
+                color= period2,
+                group = interaction(pulse_num2, period2))) +
+  facet_wrap(~variable,
+             ncol = 1,
+             scales = "free_y",
+             strip.position = "left") +
+  scale_x_date() +
+  scale_color_manual(values = RColorBrewer::brewer.pal(4, "Paired")[4:3]) +
+  theme_bw(base_size = 14) +
+  theme(panel.grid = element_blank(),
+        axis.title = element_blank(),
+        strip.placement = "outside",
+        strip.background = element_blank()) +
+  guides(color = "none")
+fig_5
+
+fig_6 <- sub_long |>
+  filter(trt_s == "S1") |>
+  ggplot() +
+  geom_vline(data = irig |> filter(trt_s == "S1"),
+             aes(xintercept = date),
+             lty = "dotted")  +
+  geom_point(aes(x = date_col, y = value,
+                 color = period2),
+             alpha = 0.25) +
+  geom_errorbar(data = sub_long_sum |>
+                  filter(trt_s == "S1"),
+                aes(x = date_col, 
+                    ymin = var_m - var_sd, ymax = var_m + var_sd,
+                    color= period2),
+                width = 0) +
+  geom_point(data = sub_long_sum |>
+               filter(trt_s == "S1"),
+             aes(x = date_col, y = var_m,
+                 color= period2),
+             size = 2) +
+  geom_line(data = sub_long_sum |>
+              filter(trt_s == "S1"),
+            aes(x = date_col, y = var_m,
+                color= period2,
+                group = interaction(pulse_num2, period2))) +
+  scale_y_reverse() +
+  scale_x_date() +
+  scale_color_manual(values = RColorBrewer::brewer.pal(4, "Paired")[4:3]) +
+  facet_wrap(~variable,
+             ncol = 1,
+             scales = "free_y",
+             strip.position = "left") +
+  theme_bw(base_size = 14) +
+  theme(panel.grid = element_blank(),
+        axis.title = element_blank(),
+        strip.placement = "outside",
+        strip.background = element_blank()) +
+  guides(color = "none")
+
+plot_grid(fig_5, fig_6,
+          ncol = 2,
+          align = "v",
+          labels = "auto")
+
