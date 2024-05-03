@@ -276,5 +276,21 @@ dups <- merged |>
 out <- merged |> 
   anti_join(dups)
 
-write_csv(out, paste0('data_clean/hyp_indices.csv'))
+# write_csv(out, paste0('data_clean/hyp_indices.csv'))
+# Fix treatment labels
+out <- read_csv("data_clean/hyp_indices.csv")
+table(out$ID, out$trt) # some mismatches in H1
 
+trt <- readxl::read_excel("data/treatments.xlsx") |>
+  mutate(ID = paste0("H", House, "P", Plot),
+         trt_w = paste0("W", Winter),
+         trt_s = paste0("S", Summer)) |>
+  dplyr::select(-1:-4)
+
+out2 <- out |>
+  dplyr::select(-starts_with("trt")) |>
+  left_join(trt, by = join_by(ID)) |>
+  mutate(trt = paste0(trt_w, trt_s))
+table(out2$ID, out2$trt) # No more mismatches
+
+write_csv(out2, paste0('data_clean/hyp_indices.csv'))
