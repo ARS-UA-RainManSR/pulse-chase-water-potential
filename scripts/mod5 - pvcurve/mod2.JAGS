@@ -1,0 +1,65 @@
+model{
+  
+  for(i in 1:N) {
+    # Likelihood
+    y[i] ~ dnorm(mu[i], tau)
+    # Predictive distribution
+    y.rep[i] ~ dnorm(mu[i], tau)
+    # residuals
+    resid[i] <- mu[i] - y[i]
+    # squared differences
+    sqdiff[i] <- pow(y[i] - y.rep[i], 2)
+    
+    # Regression - changepoint between exponential decay and linear
+    mu[i] <- 
+      step(cp[plot[i]] - irwc[i]) * (a[plot[i]]*exp(b[plot[i]]*irwc[i])) +
+      step((irwc[i] - cp[plot[i]]))*(-1*c[plot[i]]*irwc[i] + d[i])
+           
+    # Reparmeterization
+    d[i] <- a[plot[i]]*exp(b[plot[i]]*cp[plot[i]]) - (-1*c[plot[i]]*cp[plot[i]])
+           
+  }
+    
+  # Priors for plot-level parameters
+  for(p in 1:Nplot) {
+    a[p] ~ dnorm(mu.a, tau.a)
+    b[p] ~ dnorm(mu.b, tau.b)
+    c[p] ~ dlnorm(mu.log.c, tau.log.c) # constrain to be negative
+    cp[p] ~ dnorm(mu.cp, tau.cp)
+    
+    # Calculate turgor loss point to monitor
+    tlp[p] <- -1 / (a[p]*exp(b[p]*cp[p]))
+  }
+  
+  # Root node priors
+  mu.a ~ dnorm(0, 0.0001)
+  mu.b ~ dnorm(0, 0.0001)
+  mu.log.c ~ dnorm(0, 0.0001)
+  mu.c <- exp(mu.log.c)
+  tau.a <- pow(sig.a, -2)
+  sig.a ~ dunif(0, 10)
+  tau.b <- pow(sig.b, -2)
+  sig.b ~ dunif(0, 10)
+  tau.log.c <- pow(sig.log.c, -2)
+  sig.log.c ~ dunif(0, 10)
+  tau.cp <- pow(sig.cp, -2)
+  sig.cp ~ dunif(0, 10)
+  
+  
+  # Informative priors for changepoint
+  mu.cp ~ dunif(0.2, 0.5)
+  mu.tlp <- -1/(mu.a*exp(mu.b*mu.cp))
+  
+  # Observation precision
+  tau ~ dgamma(0.01, 0.01)
+  sig <- pow(tau, -0.5)
+  
+  # Dsum
+  Dsum <- sum(sqdiff[])
+  # Bayesian R2
+  var.pred <- pow(sd(mu[]),2)
+  var.resid <- 1/tau
+  R2 <- var.pred/(var.pred + var.resid)
+    
+  
+}

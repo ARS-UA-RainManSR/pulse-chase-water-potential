@@ -1,0 +1,45 @@
+model{
+  
+  for(i in 1:N) {
+    # Likelihood
+    y[i] ~ dnorm(mu[i], tau)
+    # Predictive distribution
+    y.rep[i] ~ dnorm(mu[i], tau)
+    # residuals
+    resid[i] <- mu[i] - y[i]
+    # squared differences
+    sqdiff[i] <- pow(y[i] - y.rep[i], 2)
+    
+    # Regression - changepoint between exponential decay and linear
+    mu[i] <- 
+      step(cp - irwc[i]) * (a*exp(b*irwc[i])) +
+      step(irwc[i] - cp)*(-1*c*irwc[i] + d)
+           
+  }
+  
+  # Reparmeterization of linear intercept
+  d <- a*exp(b*cp) - (-1*c*cp)
+   
+  # Root node priors
+  a ~ dnorm(0, 0.0001)
+  b ~ dnorm(0, 0.0001)
+  log.c ~ dlnorm(0, 1)
+  c <- exp(log.c)
+  
+  # Informative priors for changepoint
+  cp ~ dunif(0.3, 0.6)
+  tlp <- -1/(a*exp(b*cp))
+  
+  # Observation precision
+  tau ~ dgamma(0.01, 0.01)
+  sig <- pow(tau, -0.5)
+  
+  # Dsum
+  Dsum <- sum(sqdiff[])
+  # Bayesian R2
+  var.pred <- pow(sd(mu[]),2)
+  var.resid <- 1/tau
+  R2 <- var.pred/(var.pred + var.resid)
+    
+  
+}
