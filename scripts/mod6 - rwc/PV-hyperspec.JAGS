@@ -16,8 +16,8 @@ model{
     mu[i] <- -1*inv.b[period[i]] * (log.RWC[i] - log.a[period[i]])
     
     #### Missing RWC model ####
-    # Likelihood (truncated so natural log can be guaranteed)
-    RWC[i] ~ dnorm(mu.rwc[i], tau.rwc)T(0,)
+    # Likelihood (truncated to stay within bounds of actual RWC)
+    RWC[i] ~ dnorm(mu.rwc[i], tau.rwc)T(0,1)
 
     # Mean model
     logit.mu.rwc[i] = B[1] + B[2]*RWC_ind[i]

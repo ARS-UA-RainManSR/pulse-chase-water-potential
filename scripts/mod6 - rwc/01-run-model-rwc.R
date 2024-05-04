@@ -93,10 +93,10 @@ inits <- function() {
 }
 inits_list <- list(inits(), inits(), inits())
 
-load("scripts/mod6 - rwc/inits/inits_rwc.Rdata")
+load("scripts/mod6 - rwc/inits/inits.Rdata")
 
 # Jags model
-jm <- jags.model(file = "scripts/mod6 - rwc/rwc.JAGS.R",
+jm <- jags.model(file = "scripts/mod6 - rwc/PV-hyperspec.JAGS",
                  data = dat_list,
                  # inits = inits_list,
                  inits = saved_state[[2]],
@@ -156,9 +156,9 @@ gel$psrf |>
 # final[[1]]
 # saved_state <- removevars(final, variables = c(2:5, 8:9))
 # saved_state[[1]]
-# save(saved_state, file = "scripts/mod6 - rwc/inits/inits_rwc.Rdata")
+# save(saved_state, file = "scripts/mod6 - rwc/inits/inits.Rdata")
 
-save(coda_params, file = "scripts/mod6 - rwc/coda/coda_params_rwc.Rdata")
+save(coda_params, file = "scripts/mod6 - rwc/coda/coda_params.Rdata")
 
 
 # Sample predicted WP
