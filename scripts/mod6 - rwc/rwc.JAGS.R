@@ -1,0 +1,56 @@
+model{
+  for(i in 1:N){
+    
+    #### Gardner Model ####
+    # Likelihood
+    log.abs.WP[i] ~ dnorm(mu[i], tau)
+    # Replicated data for predictive sampling
+    log.abs.WP.rep[i] ~ dnorm(mu[i], tau)
+    # Residuals
+    resid[i] <- mu[i] - log.abs.WP[i]
+    # Squared differences
+    sqdiff[i] <- pow(log.abs.WP[i] - log.abs.WP.rep[i], 2)
+    
+    # Gardner regression model
+    log.RWC[i] <- log(RWC[i])
+    mu[i] <- -1*inv.b[period[i]] * (log.RWC[i] - log.a[period[i]])
+    
+    #### Missing RWC model ####
+    # Likelihood (truncated so natural log can be guaranteed)
+    RWC[i] ~ dnorm(mu.rwc[i], tau.rwc)T(0,)
+
+    # Mean model
+    logit.mu.rwc[i] = B[1] + B[2]*RWC_ind[i]
+    mu.rwc[i] = ilogit(logit.mu.rwc[i])
+  }
+  
+  # Priors for missing RWC parameters
+  for(j in 1:2) { # 2 parameters in simple linear model
+    B[j] ~ dnorm(0, 0.01)
+  }
+
+  # Priors for Gardner parameters means
+  for(k in 1:2) { # 2 periods, predawn and midday
+    inv.b[k] ~ dnorm(0, 0.01)
+    log.a[k] ~ dnorm(0, 0.01)
+    
+    # True parameters to monitor
+    b.mu[k] <- pow(inv.b[k], -1)
+    a.mu[k] <- exp(log.a[k])
+  }
+  
+  # Prior for observation variance
+  tau ~ dgamma(0.01, 0.01)
+  tau.rwc ~ dgamma(0.01, 0.01)
+  sig <- pow(tau, -0.5)
+  sig.rwc <- pow(tau.rwc, -0.5)
+  
+  # Posterior predictive loss - whole model
+  Dsum <- sum(sqdiff[])
+  # Bayesian R2
+  # Compute Bayesian R2 value
+  var.pred <- pow(sd(mu[]),2)
+  var.resid <- 1/tau
+  R2 <- var.pred/(var.pred + var.resid)
+
+}
