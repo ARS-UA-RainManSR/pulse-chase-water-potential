@@ -45,14 +45,29 @@ hyp_wide <- read_csv("data_clean/wp_rwc_long.csv") |>
   mutate(RWC_ind_scale = scale(RWC_ind))
 
 
-dat <- hyp_wide |>
-  filter(phase == "Phase 2",
-         !is.na(RWC_ind)) |> # 76 observations of RWC_ind and WP, but 61 observations of RWC
-  select(-ID_long:-WPI2, -CNDI) |>
-  mutate(logitRWC = log(RWC/(1-RWC)))
+# Load predicted RWC
+load(file = "scripts/mod6 - rwc/coda/coda_pred_rwc.Rdata")
+
+rwc_sum <- tidyMCMC(coda_rwc,
+                     conf.int = TRUE,
+                     conf.method = "HPDinterval") %>%
+  rename(rwc.mean = estimate,
+         rwc.lower = conf.low,
+         rwc.upper = conf.high)
+
+# Load predicted WP
+load(file = "scripts/mod6 - rwc/coda/coda_pred_wp.Rdata")
+
+wp_sum <- tidyMCMC(coda_pred,
+                   conf.int = TRUE,
+                   conf.method = "HPDinterval") %>%
+  mutate(WP.mean = -1*exp(estimate),
+         WP.lower = -1*exp(conf.high),
+         WP.upper = -1*exp(conf.low)) |>
+  dplyr::select(-2:-5)
 
 # Load coda
-load("scripts/mod6 - rwc/coda/coda_params_rwc.Rdata")
+load("scripts/mod6 - rwc/coda/coda_params.Rdata")
 
 param_sum <- tidyMCMC(coda_params,
                      conf.int = TRUE,
@@ -71,20 +86,52 @@ B_df <- param_sum |>
               values_from = pred.mean) |>
   mutate(phase = "Phase 2")
 
+# Create predicted line for Phase 2
+rwc_from_ind <- function(rwc_ind) {
+  logitRWC = B_df$Intercept + B_df$Slope * rwc_ind
+  muRWC = exp(logitRWC)/(1 + exp(logitRWC))
+  return(muRWC)
+}
+
+rwc_pred <- data.frame(rwc_ind = seq(-3, 3, by = 0.01)) |>
+  mutate(muRWC = rwc_from_ind(rwc_ind),
+         phase = "Phase 2") 
+
+# Estimate missing RWC
+imputeRWC_df <- hyp_wide |>
+  filter(phase == "Phase 2") |>
+  bind_cols(rwc_sum) |>
+  filter(is.na(RWC)) |>
+  mutate(logitrwc.upper = log(rwc.upper / (1-rwc.upper)),
+         logitrwc.lower = log(rwc.lower / (1-rwc.lower)))
+
 # 32 missing RWC overall, 15 missing from Phase 2
 fig_b <-
-  ggplot(hyp_wide, aes(x = RWC_ind_scale, y = log(RWC/(1-RWC)))) +
-  geom_abline(data = B_df,
-              aes(slope = Slope,
-                  intercept = Intercept)) +
-  geom_point(aes(color = period2)) +
-  facet_wrap(~phase) +
-  scale_x_continuous(expression(paste(RWC[ind], " (scaled)"))) +
-  scale_y_continuous("logit(RWC)",
-                     limits = c(-1.5, 4)) +
-  theme_bw(base_size = 14) +
-  theme(panel.grid = element_blank()) +
-  guides(color = "none")
+  ggplot() +
+    geom_line(data = rwc_pred,
+              aes(x = rwc_ind, y = muRWC)) + 
+    geom_point(data = hyp_wide, 
+               aes(x = RWC_ind_scale, 
+                   y = RWC,
+                   color = period2)) +
+    geom_errorbar(data = imputeRWC_df,
+                  aes(x = RWC_ind_scale,
+                      ymax = rwc.upper,
+                      ymin = rwc.lower,
+                      color = period2),
+                  alpha = 0.25,
+                  width = 0) +
+    geom_point(data = imputeRWC_df,
+                  aes(x = RWC_ind_scale,
+                      y = rwc.mean,
+                      color = period2),
+               shape = 15) +
+    facet_wrap(~phase) +
+    scale_x_continuous(expression(paste(RWC[ind], " (scaled)"))) +
+    scale_y_continuous(expression(paste(RWC, " (g", " ", g^-1, ")"))) +
+    theme_bw(base_size = 14) +
+    theme(panel.grid = element_blank()) +
+    guides(color = "none")
 
 ##### Plot WP vs. RWC ####
 # Create Gardener parameters
@@ -112,7 +159,7 @@ gard <- function(rwc, tod) {
   return(absWP)
 }
 
-gard_pred <- data.frame(rwc = seq(min(hyp_wide$RWC, na.rm = T), 1, by = 0.01)) |>
+gard_pred <- data.frame(rwc = seq(0.25, 1, by = 0.01)) |>
   mutate(PD = gard(rwc, "PD"),
          MD = gard(rwc, "MD")) |>
   pivot_longer(-rwc,
@@ -120,6 +167,14 @@ gard_pred <- data.frame(rwc = seq(min(hyp_wide$RWC, na.rm = T), 1, by = 0.01)) |
                values_to = "absWP") |>
   mutate(WP = -1 * absWP,
          phase = "Phase 2")
+
+
+# Dataframe of imputed RWC and modeled WP
+imputeWP_df <- hyp_wide |>
+  filter(phase == "Phase 2") |>
+  bind_cols(rwc_sum) |>
+  bind_cols(wp_sum) |>
+  filter(is.na(RWC))
 
 # 32 missing RWC overall, 15 missing from Phase 2
 fig_a <-
@@ -130,6 +185,23 @@ fig_a <-
   geom_point(data = hyp_wide,
              aes(x = RWC, y = WP,
                  color = period2)) +
+    geom_errorbarh(data = imputeWP_df,
+                  aes(y = WP,
+                      xmax = rwc.upper,
+                      xmin = rwc.lower,
+                      color = period2),
+                  alpha = 0.25) +
+    # geom_errorbar(data = imputeWP_df,
+    #                aes(x = rwc.mean,
+    #                    ymax = WP.upper,
+    #                    ymin = WP.lower,
+    #                    color = period2),
+    #                alpha = 0.25) +
+    geom_point(data = imputeWP_df,
+               aes(x = rwc.mean,
+                   y = WP,
+                   color = period2),
+               shape = 15) +
   facet_wrap(~phase) +
   scale_x_continuous(expression(paste(RWC, " (g", " ", g^-1, ")"))) +
   scale_y_continuous(expression(paste(Psi, " (MPa)"))) +
