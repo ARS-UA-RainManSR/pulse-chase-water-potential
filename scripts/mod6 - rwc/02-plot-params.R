@@ -209,5 +209,5 @@ fig_a <-
   theme(panel.grid = element_blank()) +
   guides(color = "none")
 
-plot_grid(fig_a, fig_b, ncol = 1,
+plot_grid(fig_b, fig_a, ncol = 1,
           align = "hv")

@@ -230,9 +230,9 @@ preds |>
             parse = TRUE,
             hjust = 1) +
   scale_x_continuous(expression(paste("Observed ", Psi, " (MPa)")),
-                     limits = c(-9.1, 0)) +
+                     limits = c(-9.5, 0)) +
   scale_y_continuous(expression(paste("Predicted ", Psi, " (MPa)")),
-                     limits = c(-9.1, 0)) +
+                     limits = c(-9.5, 0)) +
   theme_bw(base_size = 14) +
   guides(color = "none") +
   theme(panel.grid = element_blank()) +
