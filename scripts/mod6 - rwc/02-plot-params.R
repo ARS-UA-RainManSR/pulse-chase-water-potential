@@ -125,7 +125,8 @@ fig_b <-
                   aes(x = RWC_ind_scale,
                       y = rwc.mean,
                       color = period2),
-               shape = 15) +
+               shape = 21,
+               size = 2) +
     facet_wrap(~phase) +
     scale_x_continuous(expression(paste(RWC[ind], " (scaled)"))) +
     scale_y_continuous(expression(paste(RWC, " (g", " ", g^-1, ")"))) +
@@ -201,7 +202,8 @@ fig_a <-
                aes(x = rwc.mean,
                    y = WP,
                    color = period2),
-               shape = 15) +
+               shape = 21, 
+               size = 2) +
   facet_wrap(~phase) +
   scale_x_continuous(expression(paste(RWC, " (g", " ", g^-1, ")"))) +
   scale_y_continuous(expression(paste(Psi, " (MPa)"))) +
