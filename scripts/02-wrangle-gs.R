@@ -83,6 +83,8 @@ gst <- gs |>
 # write out
 write_csv(gst, file = "data_clean/gs_leaftemp.csv")
 
+gst <- read_csv(file = "data_clean/gs_leaftemp.csv")
+
 # Quick plot timeseries of gs
 gst |> 
   ggplot(aes(x = dt.x,
