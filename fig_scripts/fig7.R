@@ -36,14 +36,6 @@ num_total <- swp |>
                               "Phase 1", "Phase 2")) |>
   group_by(summer) |>
   count(phase_total)
-  ungroup() |>
-  group_by(summer) |>
-  summarize(total_phase = sum(total))
-  mutate(lab = paste0(n, " days"),
-         y = case_when(depth == "0-12 cm" & phase == "Phase 1" ~ -4.5,
-                       depth == "0-12 cm" & phase == "Phase 2" ~ -5,
-                       depth == "25 cm" & phase == "Phase 1" ~ -2,
-                       depth == "25 cm" & phase == "Phase 2" ~ -2.5))
 
 # Establish SWP thresholds by depth
 thresh <- data.frame(depth = c("0-12 cm", "25 cm"),
@@ -85,8 +77,8 @@ fig7 <- swp |>
                                   "2023-09-04")),
                date_labels = "%b %d") +
   scale_y_continuous(expression(paste(Psi[soil], " (MPa)"))) +
-  scale_color_manual(values = cols_div[c(6,3)]) +
-  scale_fill_manual(values = cols_div[c(6,3)],
+  scale_color_manual(values = c(cols_div[c(6)], "tan")) +
+  scale_fill_manual(values = c(cols_div[c(6)], "tan"),
                     labels = c("Phase 1", "Phase 2")) +
   guides(color = "none") +
   theme_bw(base_size = 14) +

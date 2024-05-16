@@ -86,7 +86,7 @@ wp_all <- wp |>
 mr1 <- lme4::lmer(value ~ period2 + Dmean*phase + (1|ID), data = wp_all)
 summary(mr1)
 coef(mr1)
-mm1 <- lme(value ~ Time + VPD*Phase, random= ~1|ID, data = wp_all)
+mm1 <- nlme::lme(value ~ Time + VPD*Phase, random= ~1|ID, data = wp_all)
 summary(mm1) # 
 coef(mm1)
 anova(mm1) # interaction between Dmean:phase is not significant
@@ -113,7 +113,7 @@ lab1 <- params1 |>
 # Does the effect of SWP change by phase, depending on time of day?
 mr2 <- lme4::lmer(value ~ period2 + SWP_1*phase + (1|ID), data = wp_all)
 summary(mr2)
-mm2 <- lme(value ~ Time + SWP*Phase, random = ~1|ID, data = wp_all)
+mm2 <- nlme::lme(value ~ Time + SWP*Phase, random = ~1|ID, data = wp_all)
 summary(mm2)
 coef(mm2)
 anova(mm2) # interaction between Dmean:phase is not significant
@@ -146,7 +146,7 @@ cols_div <- brewer.pal(7, "Spectral")
 display.brewer.pal(7, "Spectral")
 
 labs <- c(lapply(c("PD", "MD"), function(i) bquote(Psi[.(i)])))
-strip <- strip_themed(background_x = elem_list_rect(fill = cols_div[c(6,3)]))
+strip <- strip_themed(background_x = elem_list_rect(fill = c(cols_div[6], "tan")))
 
 fig5a <-
   wp_all |> 

@@ -152,7 +152,7 @@ fig4 <- preds |>
                      guide = "axis_minor") +
   scale_color_manual(values = c(cols_gn[4], cols_br_gn[1], "coral"),
                      labels = labs) +
-  scale_fill_manual(values = cols_div[c(3,6,3)]) +
+  scale_fill_manual(values = c("tan", cols_div[6], "tan")) +
   theme_bw(base_size = 12) +
   theme(ggh4x.axis.ticks.length.minor = rel(1),
         panel.grid = element_blank(),
