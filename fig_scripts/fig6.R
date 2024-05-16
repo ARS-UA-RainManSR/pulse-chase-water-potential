@@ -182,7 +182,7 @@ fig6a <- wp |>
   geom_vline(data = cps,
              aes(xintercept = pred.mean),
              lty = "longdash") +
-  scale_x_continuous("Days since pulse") +
+  scale_x_continuous("Days since S4 pulse") +
   scale_y_continuous(expression(paste(Psi[leaf], " (MPa)"))) +
   scale_color_manual(values = cols_gn[c(4,3)]) +
   guides(color = guide_legend(override.aes = list(linetype = 0))) +
@@ -221,7 +221,7 @@ fig6b <- rwc |>
   geom_vline(data = cps,
              aes(xintercept = pred.mean),
              lty = "longdash") +
-  scale_x_continuous("Days since pulse") +
+  scale_x_continuous("Days since S4 pulse") +
   scale_y_continuous(expression(paste("RWC (g ", g^-1, ")"))) +
   scale_color_manual(values = cols_gn[c(4,3)]) +
   guides(color = "none") +
@@ -257,7 +257,7 @@ fig6c <- pri |>
   geom_vline(data = cps,
              aes(xintercept = pred.mean),
              lty = "longdash") +
-  scale_x_continuous("Days since pulse") +
+  scale_x_continuous("Days since S4 pulse") +
   scale_y_continuous("PRI") +
   scale_color_manual(values = cols_gn[c(4,3)]) +
   guides(color = "none") +
@@ -294,7 +294,7 @@ fig6d <-
   geom_vline(data = cps,
              aes(xintercept = pred.mean),
              lty = "longdash") +
-  scale_x_continuous("Days since pulse") +
+  scale_x_continuous("Days since S4 pulse") +
   scale_y_reverse(expression(paste(RWC[ind]))) +
   scale_color_manual(values = cols_gn[c(4,3)]) +
   guides(color = "none") +
@@ -329,7 +329,7 @@ fig6e <- gpp |>
   geom_vline(data = cps,
              aes(xintercept = pred.mean),
              lty = "longdash") +
-  scale_x_continuous("Days since pulse") +
+  scale_x_continuous("Days since S4 pulse") +
   scale_y_continuous(expression(paste("GPP (", mu, "mol ", CO[2], " ", m^-2, s^-1, ")"))) +
   scale_shape_manual(values = 15) +
   guides(color = "none",
@@ -362,7 +362,7 @@ fig6f <- gpp |>
   geom_vline(data = cps,
              aes(xintercept = pred.mean),
              lty = "longdash") +
-  scale_x_continuous("Days since pulse") +
+  scale_x_continuous("Days since S4 pulse") +
   scale_y_continuous(expression(paste("ET (mmol ", H[2], O, " ", m^-2, s^-1, ")"))) +
   guides(color = "none") +
   theme_bw(base_size = 14) +
@@ -418,7 +418,7 @@ fig6g <-
   geom_vline(data = cps,
              aes(xintercept = pred.mean),
              lty = "longdash") +
-  scale_x_continuous("Days since pulse") +
+  scale_x_continuous("Days since S4 pulse") +
   scale_y_continuous(expression(paste("ET (mmol ", H[2], O, " ", m^-2, s^-1, ")")),
                      sec.axis = sec_axis(~.*50, 
                                          expression(paste(g[s], " (mmol ", H[2], "O ", m^-2, " ", s^-1, ")")))) +
@@ -454,3 +454,27 @@ ggsave(filename = "fig_scripts/fig6.png",
        height = 7,
        width = 7,
        units = "in")
+
+# Figure out which plots were used for S4 tent gas exchange
+
+tent_plots <- gpp |>
+  group_by(Plot) |>
+  summarize(orig = unique(Plot)) |>
+  mutate(plot = str_extract(orig, pattern = "H\\d{1}P\\d{2}"),
+         plot = case_when(plot == "H3P06" ~ "H3P6",
+                          plot == "H4P07" ~ "H4P7",
+                          plot == "H5P03" ~ "H5P3",
+                          .default = plot))
+tent_plots
+
+
+pulse_plots <-  wp |>
+  group_by(ID, trt_s, trt_w) |>
+  summarize(plot = unique(ID))
+
+pulse_plots
+
+intersect(tent_plots$plot, pulse_plots$plot)
+
+# Three plots in common, which shared W2S4 treatments
+# The other three pulse plots were W3W4, to gain sufficient DICA for sampling
