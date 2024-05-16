@@ -192,7 +192,7 @@ wp_dates <- read_csv("data_clean/wp_wide.csv") |>
 # Summer (JAS) 2023 irrigation, daily Tmean (with range from Tmin to Tmax), and daily VPD
 # With rectangles indicating pulses
 # and x's marking sampling days
-fig_b <- env |> 
+fig_b <-  env |> 
   ggplot() +
   geom_rect(data = pulse, 
             aes(xmin = st, xmax = en,
@@ -214,7 +214,7 @@ fig_b <- env |>
            aes(x = date,
                y = irig, 
                fill = trt_s),
-           position = "dodge") +
+           position = position_dodge(width = 1.4)) +
   scale_x_date(breaks = as.Date(c("2023-07-03", "2023-07-24",
                                   "2023-08-14", "2023-09-04",
                                   "2023-09-25")),
@@ -228,7 +228,8 @@ fig_b <- env |>
   theme(panel.grid = element_blank(),
         axis.title.x = element_blank(),
         axis.title.y.right = element_text(color = "coral"),
-        legend.position = c(0.93, 0.8),
+        legend.position = "inside",
+        legend.position.inside = c(0.93, 0.8),
         legend.text = element_text(size = 8),
         legend.title = element_text(size = 10),
         legend.background = element_blank())
@@ -240,8 +241,8 @@ fig1 <- plot_grid(fig_a, fig_b, align = "v",
           ncol = 1,
           labels = "auto")
 
-ggsave("fig_scripts/fig1.png",
-       fig1,
-       height = 6,
+ggsave("fig_scripts/fig1b.png",
+       fig_b,
+       height = 3.5,
        width = 8,
        units = "in")
