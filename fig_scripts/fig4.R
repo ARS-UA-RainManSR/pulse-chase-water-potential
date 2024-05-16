@@ -145,7 +145,7 @@ fig4 <- preds |>
                      sec.axis = sec_axis(~.+3, 
                                          "VPD (kPa)",
                                          breaks = 0:3)) +
-  scale_x_continuous(name = "Days since pulse", 
+  scale_x_continuous(name = "Days since S4 pulse", 
                      minor_breaks = seq(0, 21, 1),
                      breaks = seq(0, 21, 3),
                      limits = c(0, 21),
@@ -157,7 +157,8 @@ fig4 <- preds |>
   theme(ggh4x.axis.ticks.length.minor = rel(1),
         panel.grid = element_blank(),
         legend.title = element_blank(),
-        legend.position = c(0.25, 0.2),
+        legend.position = "inside",
+        legend.position.inside = c(0.25, 0.2),
         legend.background = element_blank(),
         axis.title.y.right = element_text(color = "coral")) +
   guides(fill = "none",
