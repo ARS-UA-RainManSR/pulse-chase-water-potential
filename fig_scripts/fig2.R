@@ -53,17 +53,28 @@ swp <- read_csv("data_clean/swp_daily_daytime.csv") |>
   filter(period == "morn",
          depth != "75 cm",
          summer != "S3",
-         date <= as.Date("2023-09-04", tz = "America/Phoenix"))
+         date >= as.Date("2023-08-14", tz = "America/Phoenix"),
+         date <= as.Date("2023-09-04", tz = "America/Phoenix")) |>
+  mutate(trt_label = case_when(summer == "S1" ~ "P3.5",
+                               summer == "S2" ~ "P7",
+                               summer == "S4" ~ "P21") |>
+           factor(levels = c("P3.5", "P7", "P21")))
 
 vwc <- read_csv("data_clean/vwc_daily_daytime.csv") |> 
   filter(period == "morn",
          depth != "75 cm",
          summer != "S3",
-         date <= as.Date("2023-09-04", tz = "America/Phoenix"))
+         date >= as.Date("2023-08-14", tz = "America/Phoenix"),
+         date <= as.Date("2023-09-04", tz = "America/Phoenix")) |>
+  mutate(trt_label = case_when(summer == "S1" ~ "P3.5",
+                               summer == "S2" ~ "P7",
+                               summer == "S4" ~ "P21") |>
+           factor(levels = c("P3.5", "P7", "P21")))
 
 # Create shading boxes for each pulse
 
 pulse <- data.frame(summer = c("S4", "S1", "S2", "S1", "S2"),
+                    trt_label = c("P21", "P3.5", "P7", "P3.5", "P7"),
                     pulse_num = c(1, 1, 1, 2, 2),
                     st = c(as.Date("2023-08-14", tz = "America/Phoenix"),
                            as.Date("2023-08-14", tz = "America/Phoenix"),
@@ -74,7 +85,9 @@ pulse <- data.frame(summer = c("S4", "S1", "S2", "S1", "S2"),
                            as.Date("2023-08-17", tz = "America/Phoenix"),
                            as.Date("2023-08-21", tz = "America/Phoenix"),
                            as.Date("2023-08-24", tz = "America/Phoenix"),
-                           as.Date("2023-08-28", tz = "America/Phoenix")))
+                           as.Date("2023-08-28", tz = "America/Phoenix"))) |>
+  mutate(trt_label = factor(trt_label, levels = c("P3.5", "P7", "P21")))
+
 
 # colors
 cols_br_gn <- brewer.pal(7, "BrBG")
@@ -107,7 +120,7 @@ fig_b <- ggplot() +
   scale_color_manual(values = cols_br_gn[1:2],
                      label = labs) +
   scale_linetype_manual(values = c("solid", "longdash")) +
-  facet_grid(cols = vars(summer),
+  facet_grid(cols = vars(trt_label),
              rows = vars(depth),
              scales = "free_y",
              space = "free_y") +

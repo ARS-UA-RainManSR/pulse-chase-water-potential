@@ -147,7 +147,11 @@ irig_long <- data.frame(date = seq(as.Date("2023-07-03", tz = "America/Phoenix")
                   S4 = 0)) |> 
   pivot_longer(starts_with("S"),
                names_to = "trt_s",
-               values_to = "irig")
+               values_to = "irig") |>
+  mutate(trt_label = case_when(trt_s == "S1" ~ "P3.5",
+                               trt_s == "S2" ~ "P7",
+                               trt_s == "S4" ~ "P21") |>
+           factor(levels = c("P3.5", "P7", "P21")))
 
 # Set start and end points of the summer period
 summer_st <- min(irig_long$date)
@@ -171,7 +175,8 @@ env <- read_csv("data/env/Halfhourly_VWC_SWP_Weather_092323.csv",
             Dmean = mean(VPD, na.rm = TRUE))
 
 # Create start/end dates for each of the 5 pulses
-pulse <- data.frame(trt_s = c("S4", "S1", "S2", "S1", "S2"),
+pulse <- data.frame(trt_s = c("S4", "S1", "S2", "S1", "S2"), 
+                    trt_label = c("P21", "P3.5", "P7", "P3.5", "P7"),
                     pulse_num = c(1, 1, 1, 2, 2),
                     st = c(as.Date("2023-08-14", tz = "America/Phoenix"),
                            as.Date("2023-08-14", tz = "America/Phoenix"),
@@ -182,7 +187,8 @@ pulse <- data.frame(trt_s = c("S4", "S1", "S2", "S1", "S2"),
                            as.Date("2023-08-17", tz = "America/Phoenix"),
                            as.Date("2023-08-21", tz = "America/Phoenix"),
                            as.Date("2023-08-24", tz = "America/Phoenix"),
-                           as.Date("2023-08-28", tz = "America/Phoenix")))
+                           as.Date("2023-08-28", tz = "America/Phoenix"))) |>
+  mutate(trt_label = factor(trt_label, levels = c("P3.5", "P7", "P21")))
 
 # Obtain actual sampling dates
 wp_dates <- read_csv("data_clean/wp_wide.csv") |> 
@@ -192,6 +198,10 @@ wp_dates <- read_csv("data_clean/wp_wide.csv") |>
 # Summer (JAS) 2023 irrigation, daily Tmean (with range from Tmin to Tmax), and daily VPD
 # With rectangles indicating pulses
 # and x's marking sampling days
+
+cols_bl <- brewer.pal(9, "Blues")[c(4,6,9)]
+# display.brewer.pal(9, "Blues")
+
 fig_b <-  env |> 
   ggplot() +
   geom_rect(data = pulse, 
@@ -213,7 +223,7 @@ fig_b <-  env |>
   geom_col(data = irig_long |>  filter(trt_s != "S3"),
            aes(x = date,
                y = irig, 
-               fill = trt_s),
+               fill = trt_label),
            position = position_dodge(width = 1.4)) +
   scale_x_date(breaks = as.Date(c("2023-07-03", "2023-07-24",
                                   "2023-08-14", "2023-09-04",
@@ -222,7 +232,7 @@ fig_b <-  env |>
   scale_y_continuous(expression(paste(T[air], " (°C) | irrigation (mm)")),
                      sec.axis = sec_axis(~./12,
                                          "VPD (kPa)")) +
-  scale_fill_brewer(palette = "Blues") +
+  scale_fill_manual(values = cols_bl) +
   labs(fill = "Treatment") +
   theme_bw(base_size = 14) +
   theme(panel.grid = element_blank(),
@@ -237,11 +247,11 @@ fig_b <-  env |>
 fig_b
 
 # Put it together and save
-fig1 <- plot_grid(fig_a, fig_b, align = "v",
-          ncol = 1,
-          labels = "auto")
+# fig1 <- plot_grid(fig_a, fig_b, align = "v",
+#           ncol = 1,
+#           labels = "auto")
 
-ggsave("fig_scripts/fig1b.png",
+ggsave("fig_scripts/fig1.png",
        fig_b,
        height = 3.5,
        width = 8,
