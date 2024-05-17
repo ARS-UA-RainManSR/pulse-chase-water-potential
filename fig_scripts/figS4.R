@@ -81,7 +81,7 @@ lm_text
 # colors for figure
 cols_gn <- brewer.pal(4, "Paired")
 cols_div <- brewer.pal(7, "Spectral")
-strip <- strip_themed(background_y = elem_list_rect(fill = c(cols_div[6], "tan")))
+strip <- strip_themed(background_y = elem_list_rect(fill = cols_div[c(6,3)]))
 
 
 figS4 <- ggplot() +
