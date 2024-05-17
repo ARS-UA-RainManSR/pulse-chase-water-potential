@@ -2,7 +2,7 @@
 library(coda)
 library(tidyverse)
 library(broom.mixed)
-
+library(ggh4x)
 
 # load data files
 # indices from hyperspectral
@@ -86,8 +86,10 @@ fit_df <- data.frame(missing = c("Observed RWC", "Imputed RWC"),
 # Plot the fit
 cols_gn <- brewer.pal(4, "Paired")
 display.brewer.pal(4, "Paired")
+cols_div <- brewer.pal(7, "Spectral")
 
 labs <- c(lapply(c("PD", "MD"), function(i) bquote(Psi[.(i)])))
+
 
 fig <- preds |> 
   ggplot() +
@@ -112,9 +114,9 @@ fig <- preds |>
             aes(x = -.5, y = -9.5, label = lab2),
             parse = TRUE,
             hjust = 1) +
-  scale_x_continuous(expression(paste("Observed ", Psi, " (MPa)")),
+  scale_x_continuous(expression(paste("Phase 2 observed ", Psi, " (MPa)")),
                      limits = c(-10, 0)) +
-  scale_y_continuous(expression(paste("Predicted ", Psi, " (MPa)")),
+  scale_y_continuous(expression(paste("Phase 2 predicted ", Psi, " (MPa)")),
                      limits = c(-10, 0)) +
   scale_color_manual(values = cols_gn[4:3], 
                      label = labs) +  
