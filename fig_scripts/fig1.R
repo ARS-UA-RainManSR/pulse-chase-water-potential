@@ -202,7 +202,7 @@ wp_dates <- read_csv("data_clean/wp_wide.csv") |>
 cols_bl <- brewer.pal(9, "Blues")[c(4,7,9)]
 # display.brewer.pal(9, "Blues")
 
-fig_b <-  env |> 
+fig_b <- env |> 
   ggplot() +
   geom_rect(data = pulse, 
             aes(xmin = st, xmax = en,
@@ -224,6 +224,7 @@ fig_b <-  env |>
            aes(x = date,
                y = irig, 
                fill = trt_label),
+           width = 1.5,
            position = position_dodge(width = 1.4)) +
   scale_x_date(breaks = as.Date(c("2023-07-03", "2023-07-24",
                                   "2023-08-14", "2023-09-04",
