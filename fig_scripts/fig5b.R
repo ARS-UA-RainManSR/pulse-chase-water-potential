@@ -103,7 +103,7 @@ cols_div <- brewer.pal(7, "Spectral")
 display.brewer.pal(7, "Spectral")
 
 labs <- c(lapply(c("PD", "MD"), function(i) bquote(Psi[.(i)])))
-strip <- strip_themed(background_x = elem_list_rect(fill = c(cols_div[6], "tan")))
+strip <- strip_themed(background_x = elem_list_rect(fill = c(cols_div[c(6,3)])))
 
 fig_b <-
   ggplot() +
@@ -191,7 +191,7 @@ cols_div <- brewer.pal(7, "Spectral")
 display.brewer.pal(7, "Spectral")
 
 labs <- c(lapply(c("PD", "MD"), function(i) bquote(Psi[.(i)])))
-strip <- strip_themed(background_x = elem_list_rect(fill = c(cols_div[6], "tan")))
+strip <- strip_themed(background_x = elem_list_rect(fill = c(cols_div[c(6,3)])))
 
 
 fig_a <-

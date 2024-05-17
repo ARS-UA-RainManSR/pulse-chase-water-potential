@@ -100,7 +100,7 @@ phases <- data.frame(lab = c("", "Phase 1", "Phase 2"),
                                mean(c(cps$pred.mean[2], 21))),
                      ymean = rep(0.5, 3))
 
-fig4 <- preds |> 
+fig4 <-  preds |> 
   ggplot() +
   geom_line(data = swp, 
             aes(x = days_since_pulse, y = SWP_1,
@@ -111,7 +111,7 @@ fig4 <- preds |>
   #               color = "SWP_2"),
   #           lty = "longdash") +
   geom_line(data = vpd, 
-            aes(x = days_since_pulse, y = Dmean-3,
+            aes(x = days_since_pulse, y = Dmean-4.5,
                 color = "VPD")) +
   geom_hline(data = maxy, 
              aes(yintercept = pred.mean),
@@ -142,23 +142,23 @@ fig4 <- preds |>
             vjust = 1, hjust = 0.5) +
   scale_y_continuous(expression(paste(Psi, " (MPa)")), 
                      limits = c(-4.5, 0.5),
-                     sec.axis = sec_axis(~.+3, 
+                     sec.axis = sec_axis(~.+4.5, 
                                          "VPD (kPa)",
-                                         breaks = 0:3)) +
-  scale_x_continuous(name = "Days since S4 pulse", 
+                                         breaks = 0:2)) +
+  scale_x_continuous(name = "Days since P21 pulse", 
                      minor_breaks = seq(0, 21, 1),
                      breaks = seq(0, 21, 3),
                      limits = c(0, 21),
                      guide = "axis_minor") +
   scale_color_manual(values = c(cols_gn[4], cols_br_gn[1], "coral"),
                      labels = labs) +
-  scale_fill_manual(values = c("tan", cols_div[6], "tan")) +
+  scale_fill_manual(values = cols_div[c(3,6,3)]) +
   theme_bw(base_size = 12) +
   theme(ggh4x.axis.ticks.length.minor = rel(1),
         panel.grid = element_blank(),
         legend.title = element_blank(),
         legend.position = "inside",
-        legend.position.inside = c(0.25, 0.2),
+        legend.position.inside = c(0.3, 0.3),
         legend.background = element_blank(),
         axis.title.y.right = element_text(color = "coral")) +
   guides(fill = "none",
