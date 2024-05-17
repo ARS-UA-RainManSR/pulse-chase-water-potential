@@ -182,7 +182,7 @@ fig6a <- wp |>
   geom_vline(data = cps,
              aes(xintercept = pred.mean),
              lty = "longdash") +
-  scale_x_continuous("Days since S4 pulse") +
+  scale_x_continuous("Days since P21 pulse") +
   scale_y_continuous(expression(paste(Psi[leaf], " (MPa)"))) +
   scale_color_manual(values = cols_gn[c(4,3)]) +
   guides(color = guide_legend(override.aes = list(linetype = 0))) +
@@ -221,7 +221,7 @@ fig6b <- rwc |>
   geom_vline(data = cps,
              aes(xintercept = pred.mean),
              lty = "longdash") +
-  scale_x_continuous("Days since S4 pulse") +
+  scale_x_continuous("Days since P21 pulse") +
   scale_y_continuous(expression(paste("RWC (g ", g^-1, ")"))) +
   scale_color_manual(values = cols_gn[c(4,3)]) +
   guides(color = "none") +
@@ -257,7 +257,7 @@ fig6c <- pri |>
   geom_vline(data = cps,
              aes(xintercept = pred.mean),
              lty = "longdash") +
-  scale_x_continuous("Days since S4 pulse") +
+  scale_x_continuous("Days since P21 pulse") +
   scale_y_continuous("PRI") +
   scale_color_manual(values = cols_gn[c(4,3)]) +
   guides(color = "none") +
@@ -294,7 +294,7 @@ fig6d <-
   geom_vline(data = cps,
              aes(xintercept = pred.mean),
              lty = "longdash") +
-  scale_x_continuous("Days since S4 pulse") +
+  scale_x_continuous("Days since P21 pulse") +
   scale_y_reverse(expression(paste(RWC[ind]))) +
   scale_color_manual(values = cols_gn[c(4,3)]) +
   guides(color = "none") +
@@ -329,7 +329,7 @@ fig6e <- gpp |>
   geom_vline(data = cps,
              aes(xintercept = pred.mean),
              lty = "longdash") +
-  scale_x_continuous("Days since S4 pulse") +
+  scale_x_continuous("Days since P21 pulse") +
   scale_y_continuous(expression(paste("GPP (", mu, "mol ", CO[2], " ", m^-2, s^-1, ")"))) +
   scale_shape_manual(values = 15) +
   guides(color = "none",
@@ -362,7 +362,7 @@ fig6f <- gpp |>
   geom_vline(data = cps,
              aes(xintercept = pred.mean),
              lty = "longdash") +
-  scale_x_continuous("Days since S4 pulse") +
+  scale_x_continuous("Days since P21 pulse") +
   scale_y_continuous(expression(paste("ET (mmol ", H[2], O, " ", m^-2, s^-1, ")"))) +
   guides(color = "none") +
   theme_bw(base_size = 14) +
@@ -418,7 +418,7 @@ fig6g <-
   geom_vline(data = cps,
              aes(xintercept = pred.mean),
              lty = "longdash") +
-  scale_x_continuous("Days since S4 pulse") +
+  scale_x_continuous("Days since P21 pulse") +
   scale_y_continuous(expression(paste("ET (mmol ", H[2], O, " ", m^-2, s^-1, ")")),
                      sec.axis = sec_axis(~.*50, 
                                          expression(paste(g[s], " (mmol ", H[2], "O ", m^-2, " ", s^-1, ")")))) +
