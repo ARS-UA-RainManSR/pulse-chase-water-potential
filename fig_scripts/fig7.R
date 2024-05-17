@@ -14,18 +14,31 @@ swp <- read_csv("data_clean/swp_daily_daytime.csv") |>
   mutate(phase = case_when(depth == "0-12 cm" & mean > -1 ~ "Phase 1",
                            depth == "0-12 cm" & mean <= -1 ~ "Phase 2",
                            depth == "25 cm" & mean > -1 ~ "Phase 1",
-                           depth == "25 cm" & mean <= -1 ~ "Phase 2")) |>
+                           depth == "25 cm" & mean <= -1 ~ "Phase 2"),
+         trt_label = case_when(summer == "S1" ~ "P3.5",
+                               summer == "S2" ~ "P7",
+                               summer == "S4" ~ "P21") |>
+           factor(levels = c("P3.5", "P7", "P21"))) |>
   drop_na()
 
 # Calculate days spent in each phase by treatment
+
+# Add zero for 25 cm phase 2
+
+temp <- data.frame(trt_label = "P3.5",
+                   depth = "25 cm",
+                   phase = "Phase 1",
+                   n = 0)
 num_text <- swp |>
-  group_by(summer, depth, phase) |>
+  group_by(trt_label, depth, phase) |>
   count() |>
+  bind_rows(temp) |>
   mutate(lab = paste0(n, " days"),
-         y = case_when(depth == "0-12 cm" & phase == "Phase 1" ~ -4.5,
-                       depth == "0-12 cm" & phase == "Phase 2" ~ -5,
-                       depth == "25 cm" & phase == "Phase 1" ~ -2,
-                       depth == "25 cm" & phase == "Phase 2" ~ -2.5))
+         y = case_when(depth == "0-12 cm" & phase == "Phase 1" ~ 0.3,
+                       depth == "0-12 cm" & phase == "Phase 2" ~ -3.7,
+                       depth == "25 cm" & phase == "Phase 1" ~ 0,
+                       depth == "25 cm" & phase == "Phase 2" ~ -2),
+         trt_label = factor(trt_label, levels = c("P3.5", "P7", "P21")))
 
 # Calculate total days in each phase, regardless of depth
 num_total <- swp |>
@@ -34,7 +47,7 @@ num_total <- swp |>
               values_from = phase) |>
   mutate(phase_total = ifelse(`0-12 cm` == "Phase 1" | `25 cm` == "Phase 1",
                               "Phase 1", "Phase 2")) |>
-  group_by(summer) |>
+  group_by(trt_label) |>
   count(phase_total)
 
 # Establish SWP thresholds by depth
@@ -49,7 +62,8 @@ swp_temp <- swp |>
   mutate(ymin = case_when(depth == "0-12 cm" ~ -1,
                           depth == "25 cm" ~ -1)) # should it be the same?
 
-fig7 <- swp |>
+fig7 <-
+  swp |>
   ggplot() +
   stat_difference(data = swp_temp,
                   aes(x = date,
@@ -58,16 +72,16 @@ fig7 <- swp |>
   geom_line(aes(x = date,
                 y = mean)) +
   geom_text(data = num_text |> filter(phase == "Phase 1"),
-            aes(x = as.Date("2023-09-04"), y = y,
-                label = lab, color = "Phase 1"),
+            aes(x = as.Date("2023-09-02"), y = y,
+                label = lab),
             hjust = 0) +
   geom_text(data = num_text |> filter(phase == "Phase 2"),
-            aes(x = as.Date("2023-09-04"), y = y,
-                label = lab, color = "Phase 2"),
+            aes(x = as.Date("2023-09-02"), y = y,
+                label = lab),
             hjust = 0) +
   geom_hline(data = thresh,
              aes(yintercept = swp_thresh)) +
-  facet_grid(cols = vars(summer),
+  facet_grid(cols = vars(trt_label),
              rows = vars(depth),
              scales = "free_y",
              space = "free_y") +
@@ -76,18 +90,21 @@ fig7 <- swp |>
                                   "2023-08-14",
                                   "2023-09-04")),
                date_labels = "%b %d") +
-  scale_y_continuous(expression(paste(Psi[soil], " (MPa)"))) +
-  scale_color_manual(values = c(cols_div[c(6)], "tan")) +
-  scale_fill_manual(values = c(cols_div[c(6)], "tan"),
+  scale_y_continuous(expression(paste(Psi[soil], " (MPa)")),
+                     expand = expansion(add = 0.5)) +
+  scale_color_manual(values = c(cols_div[c(6,3)])) +
+  scale_fill_manual(values = c(cols_div[c(6,3)]),
                     labels = c("Phase 1", "Phase 2")) +
-  guides(color = "none") +
+  # guides(color = "none") +
   theme_bw(base_size = 14) +
   theme(panel.grid = element_blank(),
         axis.title.x = element_blank(),
         legend.title = element_blank(),
         legend.background = element_blank(),
+        legend.text = element_text(size = 9), 
         strip.background = element_blank(),
-        legend.position = c(5, 0.55))
+        legend.position = "inside",
+        legend.position.inside = c(0.1, 0.5))
 
 
 ggsave(filename = "fig_scripts/fig7.png",
