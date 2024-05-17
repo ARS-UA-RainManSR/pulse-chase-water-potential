@@ -10,18 +10,22 @@ library(cowplot)
 both <- read_csv("data_clean/wp_rwc_long.csv") |> 
   mutate(period2 = case_when(period == "predawn" ~ "PD",
                              period == "midday" ~ "MD") |> 
-           factor(levels = c("PD", "MD")))
+           factor(levels = c("PD", "MD")),
+         trt_label = case_when(trt_s == "S1" ~ "P3.5",
+                               trt_s == "S2" ~ "P7",
+                               trt_s == "S4" ~ "P21") |>
+           factor(levels = c("P3.5", "P7", "P21")))
 
 # Separate wp and rwc
 wp <- both |> 
-  filter(variable == "WP")
+  filter(variable == "WP") 
 
 rwc <- both |> 
-  filter(variable == "RWC")
+  filter(variable == "RWC") 
 
 # Summarize both
 wp_sum <- wp |> 
-  group_by(date_col, pulse_num, trt_s, period2) |> 
+  group_by(date_col, pulse_num, trt_s, trt_label, period2) |> 
   summarize(WP_m = mean(value, na.rm = TRUE),
             WP_sd = sd(value, na.rm = TRUE),
             WP_n = sum(length(!is.na(value)))) |> 
@@ -30,7 +34,7 @@ wp_sum <- wp |>
          pulse_num2 = if_else(pulse_num2 == 4, 3, pulse_num2))
 
 rwc_sum <- rwc |> 
-  group_by(date_col, pulse_num, trt_s, period2) |> 
+  group_by(date_col, pulse_num, trt_s, trt_label, period2) |> 
   summarize(RWC_m = mean(value, na.rm = TRUE),
             RWC_sd = sd(value, na.rm = TRUE),
             RWC_n = sum(length(!is.na(value)))) |> 
@@ -43,7 +47,11 @@ irig <- read_csv("data_clean/irig_long.csv") |>
   filter(irig > 0,
          date %in% c(as.Date("2023-08-14"),
                      as.Date("2023-08-21")),
-         trt_s %in% c("S1", "S2", "S4"))
+         trt_s %in% c("S1", "S2", "S4")) |>
+  mutate(trt_label = case_when(trt_s == "S1" ~ "P3.5",
+                               trt_s == "S2" ~ "P7",
+                               trt_s == "S4" ~ "P21") |>
+           factor(levels = c("P3.5", "P7", "P21")))
 
 # Soil water potential
 swp <- read_csv("data_clean/swp_daily_daytime.csv") |> 
@@ -52,7 +60,11 @@ swp <- read_csv("data_clean/swp_daily_daytime.csv") |>
          date <= max(both$date_col),
          depth != "75 cm",
          summer != "S3") |> 
-  rename(trt_s = summer)
+  rename(trt_s = summer) |>
+  mutate(trt_label = case_when(trt_s == "S1" ~ "P3.5",
+                               trt_s == "S2" ~ "P7",
+                               trt_s == "S4" ~ "P21") |>
+           factor(levels = c("P3.5", "P7", "P21")))
 
 # Volumetric water content
 vwc <- read_csv("data_clean/vwc_daily_daytime.csv") |> 
@@ -61,7 +73,11 @@ vwc <- read_csv("data_clean/vwc_daily_daytime.csv") |>
          date <= max(both$date_col),
          depth != "75 cm",
          summer != "S3") |> 
-  rename(trt_s = summer)
+  rename(trt_s = summer) |>
+  mutate(trt_label = case_when(trt_s == "S1" ~ "P3.5",
+                               trt_s == "S2" ~ "P7",
+                               trt_s == "S4" ~ "P21") |>
+           factor(levels = c("P3.5", "P7", "P21")))
 
 ####  A) LWP + SWP ####
 
@@ -71,8 +87,7 @@ labs <- c(lapply(c("PD", "MD"), function(i) bquote(Psi[.(i)])),
 cols_br_gn <- brewer.pal(7, "BrBG")
 display.brewer.pal(7, "BrBG")
 
-figa <-
-  ggplot() +
+figa <- ggplot() +
   geom_vline(data = irig,
              aes(xintercept = date),
              lty = "dotted")  +
@@ -106,7 +121,7 @@ figa <-
   scale_y_continuous(expression(paste(Psi[leaf], " (MPa)")),
                      sec.axis = sec_axis(~.,
                                          name = expression(paste(Psi[soil], " (MPa)")))) +
-  facet_wrap(~trt_s,
+  facet_wrap(~trt_label,
              nrow = 1) +
   scale_x_date(date_labels = "%b %d",
                breaks = seq(as.Date("2023-08-14"),
@@ -121,7 +136,8 @@ figa <-
         panel.grid = element_blank(),
         strip.background = element_blank(),
         legend.title = element_blank(),
-        legend.position = c(0.25, 0.3),
+        legend.position = "inside",
+        legend.position.inside = c(0.25, 0.3),
         legend.text = element_text(size = 8),
         legend.background = element_rect(fill = NA)) +
   guides(linetype = "none",
@@ -136,7 +152,7 @@ cols_br_gn <- brewer.pal(7, "BrBG")
 display.brewer.pal(7, "BrBG")
 
 
-figb <- ggplot() +
+figb <-  ggplot() +
   geom_vline(data = irig,
              aes(xintercept = date),
              lty = "dotted")  +
@@ -170,8 +186,9 @@ figb <- ggplot() +
   scale_y_continuous(expression(paste("RWC (g ", g^-1, ")")),
                      limits = c(0, 1),
                      sec.axis = sec_axis(~./5,
-                                         name = expression(paste(Theta, " (", cm^3, cm^-3, ")")))) +  facet_wrap(~trt_s,
-             nrow = 1) +
+                                         name = expression(paste(Theta, " (", cm^3, cm^-3, ")")))) +  
+    facet_wrap(~trt_label,
+               nrow = 1) +
   scale_x_date(date_labels = "%b %d",
                breaks = seq(as.Date("2023-08-14"),
                             as.Date("2023-09-03"), 
@@ -185,7 +202,8 @@ figb <- ggplot() +
         panel.grid = element_blank(),
         strip.background = element_blank(),
         legend.title = element_blank(),
-        legend.position = c(0.25, 0.75),
+        legend.position = "inside",
+        legend.position.inside = c(0.25, 0.7),
         legend.text = element_text(size = 8),
         legend.background = element_rect(fill = NA)) +
   guides(linetype = "none",
