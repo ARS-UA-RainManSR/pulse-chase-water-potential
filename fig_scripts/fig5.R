@@ -1,6 +1,6 @@
 # Bivariate plots divided by Phase 1/2
 # Uses threshold of SWP = -1 MPa
-# And so combines data from all treatments
+# And combine data from all treatments
 
 library(coda)
 library(tidyverse)
