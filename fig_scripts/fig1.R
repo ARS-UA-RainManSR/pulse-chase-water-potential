@@ -199,7 +199,7 @@ wp_dates <- read_csv("data_clean/wp_wide.csv") |>
 # With rectangles indicating pulses
 # and x's marking sampling days
 
-cols_bl <- brewer.pal(9, "Blues")[c(4,6,9)]
+cols_bl <- brewer.pal(9, "Blues")[c(4,7,9)]
 # display.brewer.pal(9, "Blues")
 
 fig_b <-  env |> 
