@@ -81,6 +81,47 @@ wp_all <- wp |>
          SWP = SWP_1)
 
 #### Fit models ####
+
+# Does the effect of VPD change by phase, depending on time of day?
+mr1 <- lme4::lmer(value ~ period2 + Dmean*phase + (1|ID), data = wp_all)
+summary(mr1)
+coef(mr1)
+mm1 <- nlme::lme(value ~ Time + VPD*Phase, random= ~1|ID, data = wp_all)
+summary(mm1) # 
+coef(mm1)
+anova(mm1) # interaction between Dmean:phase is not significant
+# Only use significant parameters
+tm1 <- broom::tidy(mm1) |>
+  filter(effect == "fixed")
+
+params1 <- data.frame(Time = rep(c("PD", "MD"), 2),
+                      phase = rep(c("Phase 1", "Phase 2"), each = 2),
+                      ints = c(tm1$estimate[1],
+                               tm1$estimate[1] + tm1$estimate[2],
+                               tm1$estimate[1] + tm1$estimate[4],
+                               tm1$estimate[1] + tm1$estimate[2] + tm1$estimate[4]),
+                      slope = rep(c(tm1$estimate[3], 
+                                     tm1$estimate[3] + tm1$estimate[5]), each = 2),
+                      sig = c(T, T, T, T))
+
+lab1 <- params1 |>
+  group_by(phase) |>
+  summarize(slope = unique(slope)) |>
+  mutate(label = paste0("Slope: ", 
+                        round(slope, 3)))
+
+ggplot() +
+  geom_point(data = wp_all,
+             aes(x = VPD, 
+                 y = value,
+                 color = Time)) +
+  geom_abline(data = params1,
+              aes(slope = slope,
+                  intercept = ints,
+                  color = Time)) +
+  facet_wrap(~phase, scales = "free_x") +
+  theme_bw(base_size = 14)
+
 # Does the effect of SWP change by phase, depending on time of day?
 mr2 <- lme4::lmer(value ~ period2 + SWP_1*phase + (1|ID), data = wp_all)
 summary(mr2)
@@ -92,13 +133,13 @@ anova(mm2) # interaction between Dmean:phase is not significant
 tm2 <- broom::tidy(mm2) |>
   filter(effect == "fixed")
 
-params2 <- data.frame(period2 = rep(c("PD", "MD"), 2),
+params2 <- data.frame(Time = rep(c("PD", "MD"), 2),
                       phase = rep(c("Phase 1", "Phase 2"), each = 2),
                       ints = c(tm2$estimate[1],
                                tm2$estimate[1] + tm2$estimate[2],
                                tm2$estimate[1] + tm2$estimate[4],
                                tm2$estimate[1] + tm2$estimate[2] + tm2$estimate[4]),
-                      slopes = rep(c(tm2$estimate[3],
+                      slope = rep(c(tm2$estimate[3],
                                      tm2$estimate[3] + tm2$estimate[5]), each = 2),
                       sig = c(F, F, T, T))
 
@@ -108,6 +149,21 @@ lab2 <- params2 |>
   mutate(label = case_when(sig == TRUE ~ paste0("Slope: ", round(slope, 3)),
                            sig == FALSE ~ ""))
 
+ggplot() +
+  geom_point(data = wp_all,
+             aes(x = SWP, 
+                 y = value,
+                 color = Time)) +
+  geom_abline(data = params2,
+              aes(slope = slope,
+                  intercept = ints,
+                  color = Time,
+                  lty = sig)) +
+  scale_linetype_manual(values = c("longdash", "solid")) +
+  facet_wrap(~phase, scales = "free_x") +
+  theme_bw(base_size = 14) +
+  guides(linetype = "none")
+
 # Do the residuals of the SWP model (mm2) vary by VPD?
 wp_all$swp_resids <- resid(mm2)
 
@@ -116,7 +172,10 @@ wp_all |>
   geom_point(aes(color = period2)) +
   facet_wrap(~phase)
 
-mm3 <- nlme::lme(swp_resids ~ Time*VPD + VPD*Phase + Time*Phase, random = ~1|ID, data = wp_all)
+mm3 <- nlme::lme(swp_resids ~ Time*VPD + VPD*Phase + Time*Phase, 
+                 random = ~1|ID, 
+                 data = wp_all |>
+                   mutate(Time = factor(Time, levels = c("MD", "PD"))))
 summary(mm3)
 coef(mm3)
 anova(mm3) # interaction between Dmean:phase is not significant
@@ -195,27 +254,28 @@ get_int_v <- Vectorize(get_int)
 get_slope_v <- Vectorize(get_slope)
 
 # Make dataframe for plotting
-params3 <- data.frame(period2 = rep(c("PD", "MD"), 2),
+params3 <- data.frame(Time = rep(c("PD", "MD"), 2),
                       phase = rep(c("Phase 1", "Phase 2"), each = 2),
                       phase_num = rep(1:2, each = 2)) |>
-  mutate(ints = get_int_v(period2, phase_num),
-         slope = get_slope_v(period2, phase_num))
+  mutate(ints = get_int_v(Time, phase_num),
+         slope = get_slope_v(Time, phase_num))
 
 ggplot() +
   geom_point(data = wp_all,
              aes(x = VPD, 
                  y = swp_resids, # value
-                 color = period2)) +
+                 color = Time)) +
   geom_abline(data = params3,
               aes(slope = slope,
                   intercept = ints,
-                  color = period2)) +
-  facet_wrap(~phase)
+                  color = Time)) +
+  facet_wrap(~phase) +
+  theme_bw(base_size = 14)
 
 
-#### Trying out more complex model for SWP ####
+#### Trying out more complex model for VPD & and comare to mm1 ####
 
-mm4 <- nlme::lme(value ~ Time*SWP + SWP*Phase + Time*Phase, random = ~1|ID, data = wp_all)
+mm4 <- nlme::lme(value ~ Time*VPD + VPD*Phase + Time*Phase, random = ~1|ID, data = wp_all)
 summary(mm4)
 coef(mm4)
 anova(mm4) # interaction between Dmean:phase is not significant
@@ -224,7 +284,7 @@ anova(mm4) # interaction between Dmean:phase is not significant
 tm4 <- broom::tidy(mm4) |>
   filter(effect == "fixed") |>
   mutate(sig = ifelse(p.value < 0.05, TRUE, FALSE),
-         type = ifelse(grepl("SWP", term), "slope", "int")) |>
+         type = ifelse(grepl("VPD", term), "slope", "int")) |>
   separate(term, into = c("term1", "term2"), sep = ":") |>
   relocate(type, .after = term2)
 
@@ -233,7 +293,7 @@ get_slope <- function(period2, phase_num) {
   if(period2 == "PD" & phase_num == 1) {
     tm4 |>
       filter(type == "slope",
-             term1 == "SWP" & is.na(term2)) |>
+             term1 == "VPD" & is.na(term2)) |>
       pull(estimate) |>
       sum()
   } else if(period2 == "MD" & phase_num == 1) {
@@ -294,19 +354,28 @@ get_int_v <- Vectorize(get_int)
 get_slope_v <- Vectorize(get_slope)
 
 # Make dataframe for plotting
-params4 <- data.frame(period2 = rep(c("PD", "MD"), 2),
+params4 <- data.frame(Time = rep(c("PD", "MD"), 2),
                       phase = rep(c("Phase 1", "Phase 2"), each = 2),
                       phase_num = rep(1:2, each = 2)) |>
-  mutate(ints = get_int_v(period2, phase_num),
-         slope = get_slope_v(period2, phase_num))
+  mutate(ints = get_int_v(Time, phase_num),
+         slope = get_slope_v(Time, phase_num))
 
 ggplot() +
   geom_point(data = wp_all,
-             aes(x = SWP, 
+             aes(x = VPD, 
                  y = value,
-                 color = period2)) +
+                 color = Time)) +
   geom_abline(data = params4,
               aes(slope = slope,
                   intercept = ints,
-                  color = period2)) +
-  facet_wrap(~phase, scales = "free_x")
+                  color = Time)) +
+  facet_wrap(~phase, scales = "free_x") +
+  theme_bw(base_size = 14)
+
+
+# Compare varying slopes/int by time VPD model (mm4) with simple
+# VPD*Phase interaction model (mm1)
+formula(mm4)
+formula(mm1)
+
+anova(mm1, mm4)
