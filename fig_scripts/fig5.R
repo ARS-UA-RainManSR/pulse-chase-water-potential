@@ -1,6 +1,7 @@
-# Bivariate plots divided by Phase 1/2
-# Uses threshold of SWP = -1 MPa
-# And combine data from all treatments
+# alternate Figure 5
+
+# Uses threshold of SWP = -1 MPa to divide phases
+# Residuals from SWP model to evaluate sensitivity to VPD
 
 library(coda)
 library(tidyverse)
@@ -79,229 +80,277 @@ wp_all <- wp |>
          VPD = Dmean,
          SWP = SWP_1)
 
+#### Fit models ####
 
-#### Test models ####
+# Check random effects 
+foo <- wp_all |>
+  group_by(date_col, ID, plant) |>
+  count() |>
+  arrange(n)
+head(foo)
 
-# Does the effect of VPD change by phase, depending on time of day?
-mr1 <- lme4::lmer(value ~ period2 + Dmean*phase + (1|ID), data = wp_all)
-summary(mr1)
-coef(mr1)
-mm1 <- nlme::lme(value ~ Time + VPD*Phase, random= ~1|ID, data = wp_all)
-summary(mm1) # 
-coef(mm1)
-anova(mm1) # interaction between Dmean:phase is not significant
-# Only use significant parameters
-tm1 <- broom::tidy(mm1) |>
-  filter(effect == "fixed")
-
-params1 <- data.frame(period2 = rep(c("PD", "MD"), 2),
-                      phase = rep(c("Phase 1", "Phase 2"), each = 2),
-                      ints = c(tm1$estimate[1],
-                               tm1$estimate[1] + tm1$estimate[2],
-                               tm1$estimate[1] + tm1$estimate[4],
-                               tm1$estimate[1] + tm1$estimate[2] + tm1$estimate[4]),
-                      slopes = rep(c(tm1$estimate[3], 
-                                     tm1$estimate[3] + tm1$estimate[5]), each = 2),
-                      sig = c(T, T, T, T))
-
-lab1 <- params1 |>
-  group_by(phase) |>
-  summarize(slope = unique(slopes)) |>
-  mutate(label = paste0("Slope: ", 
-                     round(slope, 3)))
+# Fix mislabeled plant
+wp_all2 <- wp_all |>
+  mutate(plant = case_when(date_col == as.Date("2023-08-16") &
+                             ID == "H3P6" &
+                             period2 == "MD" ~ "D1",
+                           .default = plant))
+foo2 <- wp_all2 |>
+  group_by(date_col, ID, plant) |>
+  count() |>
+  arrange(n)
+head(foo2)
 
 # Does the effect of SWP change by phase, depending on time of day?
-mr2 <- lme4::lmer(value ~ period2 + SWP_1*phase + (1|ID), data = wp_all)
+# Random effect of plot, random effect of 
+mr2 <- lme4::lmer(value ~ Time + SWP*Phase + (plant|ID), data = wp_all2)
 summary(mr2)
-mm2 <- nlme::lme(value ~ Time + SWP*Phase, random = ~1|ID, data = wp_all)
-summary(mm2)
-coef(mm2)
-anova(mm2) # interaction between Dmean:phase is not significant
-# Only use significant parameters
-tm2 <- broom::tidy(mm2) |>
-  filter(effect == "fixed")
+# mm2 <- nlme::lme(value ~ Time + SWP*Phase, random = ~ plant|ID, data = wp_all2)
+# summary(mm2)
 
-params2 <- data.frame(period2 = rep(c("PD", "MD"), 2),
-                      phase = rep(c("Phase 1", "Phase 2"), each = 2),
-                      ints = c(tm2$estimate[1],
-                               tm2$estimate[1] + tm2$estimate[2],
-                               tm2$estimate[1] + tm2$estimate[4],
-                               tm2$estimate[1] + tm2$estimate[2] + tm2$estimate[4]),
-                      slopes = rep(c(tm2$estimate[3],
-                                     tm2$estimate[3] + tm2$estimate[5]), each = 2),
-                      sig = c(F, F, T, T))
+# Calculate KR approximation of df 
+vcovadj <- pbkrtest::vcovAdj(mr2)
+alpha <- 0.05
+digits <- 3
+pval.digits <- 3
+p.val.ub <- 0.001
 
-lab2 <- params2 |>
-  group_by(phase, sig) |>
-  summarize(slope = unique(slopes)) |>
-  mutate(label = case_when(sig == TRUE ~ paste0("Slope: ", round(slope, 3)),
-                           sig == FALSE ~ ""))
+model.fixed.effects2 <- lme4::fixef(mr2)
+fixed.effects.contrasts2 <- diag(length(model.fixed.effects2)) # for each row, non-additive
 
-#### Assemble panels ####
+model.fixef.results2 <- data.frame(parameter = as.character(rep(NA, length(model.fixed.effects2))),
+                                   estimate = as.numeric(rep(NA, length(model.fixed.effects2))),
+                                   ci = as.character(rep(NA, length(model.fixed.effects2))),
+                                   den.df = as.numeric(rep(NA, length(model.fixed.effects2))),
+                                   tstat = as.numeric(rep(NA, length(model.fixed.effects2))),
+                                   pval = as.character(rep(NA, length(model.fixed.effects2))))
+# Do linear hypothesis tests to isolate the effect of each parameter:
+for(r in 1:length(model.fixed.effects2)) {
+  contrast.mat <- matrix(fixed.effects.contrasts2[r, ], nrow = 1)
+  df <- pbkrtest::get_Lb_ddf(mr2, contrast.mat)
+  pt.est <- lme4::fixef(mr2) %*% t(contrast.mat)
+  vcov.est <- contrast.mat %*% vcovadj %*% t(contrast.mat)
+  sd.est <- sqrt(vcov.est)
+  t.stat <- sqrt(as.numeric(pt.est %*% solve(vcov.est) %*% t(pt.est)))
+  t.stat <- ifelse(pt.est < 0, -1*t.stat, t.stat)
+  p.val <- 2*pt(abs(t.stat), df, lower.tail = F)
+  model.fixef.results2[r, c("parameter", "ci", "pval")] <- c(names(model.fixed.effects2)[r],
+                                                             paste0("(", round(pt.est - sd.est*qt(1 - alpha/2, df, lower.tail = T), digits),
+                                                                    ", ", round(pt.est + sd.est*qt(1 - alpha/2, df, lower.tail = T), digits), ")"),
+                                                             ifelse(round(p.val, pval.digits) == 0, p.val.ub, round(p.val, pval.digits)))
+  model.fixef.results2[r, c("estimate", "den.df", "tstat")] <- round(c(pt.est, df, t.stat), digits)
+}
+
+# Test an additive version: four slopes and two intercepts
+param.names <- c("Phase 1:PD", "Phase 1:MD", "Phase 1:SWP",
+                 "Phase 2:PD", "Phase 2:MD", "Phase 2:SWP")
+fixed.effects.contrasts2b <- matrix(c(1,0,0,0,0,
+                                      0,1,0,0,0,
+                                      0,0,1,0,0,
+                                      1,0,0,1,0,
+                                      1,1,0,1,0,
+                                      0,0,1,0,1), ncol = 5, byrow = TRUE)
+model.fixef.results2b <- data.frame(parameter = as.character(rep(NA, nrow(fixed.effects.contrasts2b))),
+                                   estimate = as.numeric(rep(NA, nrow(fixed.effects.contrasts2b))),
+                                   ci = as.character(rep(NA, nrow(fixed.effects.contrasts2b))),
+                                   den.df = as.numeric(rep(NA, nrow(fixed.effects.contrasts2b))),
+                                   tstat = as.numeric(rep(NA, nrow(fixed.effects.contrasts2b))),
+                                   pval = as.character(rep(NA, nrow(fixed.effects.contrasts2b))))
+for(r in 1:nrow(fixed.effects.contrasts2b)) {
+  contrast.mat <- matrix(fixed.effects.contrasts2b[r, ], nrow = 1)
+  df <- pbkrtest::get_Lb_ddf(mr2, contrast.mat)
+  pt.est <- lme4::fixef(mr2) %*% t(contrast.mat)
+  vcov.est <- contrast.mat %*% vcovadj %*% t(contrast.mat)
+  sd.est <- sqrt(vcov.est)
+  t.stat <- sqrt(as.numeric(pt.est %*% solve(vcov.est) %*% t(pt.est)))
+  t.stat <- ifelse(pt.est < 0, -1*t.stat, t.stat)
+  p.val <- 2*pt(abs(t.stat), df, lower.tail = F)
+  model.fixef.results2b[r, c("parameter", "ci", "pval")] <- c(param.names[r],
+                                                             paste0("(", round(pt.est - sd.est*qt(1 - alpha/2, df, lower.tail = T), digits),
+                                                                    ", ", round(pt.est + sd.est*qt(1 - alpha/2, df, lower.tail = T), digits), ")"),
+                                                             ifelse(round(p.val, pval.digits) == 0, p.val.ub, round(p.val, pval.digits)))
+  model.fixef.results2b[r, c("estimate", "den.df", "tstat")] <- round(c(pt.est, df, t.stat), digits)
+}
+write_csv(model.fixef.results2b, "tables/SWP_cellmeans_KR.csv")
+
+# Switch to plotable params
+params2 <- model.fixef.results2b |>
+  separate(parameter, into = c("phase", "term"), sep = ":") |>
+  uncount(c(1,1,2,1,1,2)) |>
+  mutate(type = case_when(term == "SWP" ~ "slope",
+                          .default = "intercept"),
+         term = rep(c("PD", "MD"), 4),
+         sig = ifelse(pval < 0.05, TRUE, FALSE),
+         sig = ifelse(type == "slope", sig, NA)) |>
+  rename(Time = term) |>
+  mutate(Time = factor(Time, levels = c("PD", "MD"))) |>
+  select(-ci, -den.df, -tstat, -pval) |>
+  pivot_wider(names_from = type, 
+              values_from = c(estimate, sig)) |>
+  select(-sig_intercept) |>
+  rename(sig = sig_slope, intercept = estimate_intercept, slope = estimate_slope)
+
+
+#### Do the residuals of the SWP model (mm2) vary by VPD? ####
+wp_all2$wp_resids <- resid(mr2)
+
+# Fit model
+mr3 <- lme4::lmer(wp_resids ~ Time*VPD + VPD*Phase + Time*Phase + (plant|ID), 
+                 data = wp_all2)
+
+# Calculate KR approximation of df 
+vcovadj <- pbkrtest::vcovAdj(mr3)
+alpha <- 0.05
+digits <- 3
+pval.digits <- 3
+p.val.ub <- 0.001
+
+model.fixed.effects3 <- lme4::fixef(mr3)
+fixed.effects.contrasts3 <- diag(length(model.fixed.effects3)) # for each row, non-additive
+
+model.fixef.results3 <- data.frame(parameter = as.character(rep(NA, length(model.fixed.effects3))),
+                                   estimate = as.numeric(rep(NA, length(model.fixed.effects3))),
+                                   ci = as.character(rep(NA, length(model.fixed.effects3))),
+                                   den.df = as.numeric(rep(NA, length(model.fixed.effects3))),
+                                   tstat = as.numeric(rep(NA, length(model.fixed.effects3))),
+                                   pval = as.character(rep(NA, length(model.fixed.effects3))))
+# Do linear hypothesis tests to isolate the effect of each parameter:
+for(r in 1:length(model.fixed.effects3)) {
+  contrast.mat <- matrix(fixed.effects.contrasts3[r, ], nrow = 1)
+  df <- pbkrtest::get_Lb_ddf(mr3, contrast.mat)
+  pt.est <- lme4::fixef(mr3) %*% t(contrast.mat)
+  vcov.est <- contrast.mat %*% vcovadj %*% t(contrast.mat)
+  sd.est <- sqrt(vcov.est)
+  t.stat <- sqrt(as.numeric(pt.est %*% solve(vcov.est) %*% t(pt.est)))
+  t.stat <- ifelse(pt.est < 0, -1*t.stat, t.stat)
+  p.val <- 2*pt(abs(t.stat), df, lower.tail = F)
+  model.fixef.results3[r, c("parameter", "ci", "pval")] <- c(names(model.fixed.effects3)[r],
+                                                             paste0("(", round(pt.est - sd.est*qt(1 - alpha/2, df, lower.tail = T), digits),
+                                                                    ", ", round(pt.est + sd.est*qt(1 - alpha/2, df, lower.tail = T), digits), ")"),
+                                                             ifelse(round(p.val, pval.digits) == 0, p.val.ub, round(p.val, pval.digits)))
+  model.fixef.results3[r, c("estimate", "den.df", "tstat")] <- round(c(pt.est, df, t.stat), digits)
+}
+
+# Test an additive version: four slopes and two intercepts
+param.names <- c("Phase 1:PD", "Phase 1:MD", "Phase 1:PD:VPD", "Phase 1:MD:VPD",
+                 "Phase 2:PD", "Phase 2:MD", "Phase 2:PD:VPD", "Phase 2:MD:VPD")
+fixed.effects.contrasts3b <- matrix(c(1,0,0,0,0,0,0,
+                                      0,1,0,0,0,0,0,
+                                      0,0,1,0,0,0,0,
+                                      0,0,1,0,1,0,0,
+                                      1,0,0,1,0,0,0,
+                                      1,1,0,1,0,0,1,
+                                      0,0,1,0,0,1,0,
+                                      0,0,1,0,1,1,0), ncol = 7, byrow = TRUE)
+model.fixef.results3b <- data.frame(parameter = as.character(rep(NA, nrow(fixed.effects.contrasts3b))),
+                                    estimate = as.numeric(rep(NA, nrow(fixed.effects.contrasts3b))),
+                                    ci = as.character(rep(NA, nrow(fixed.effects.contrasts3b))),
+                                    den.df = as.numeric(rep(NA, nrow(fixed.effects.contrasts3b))),
+                                    tstat = as.numeric(rep(NA, nrow(fixed.effects.contrasts3b))),
+                                    pval = as.character(rep(NA, nrow(fixed.effects.contrasts3b))))
+for(r in 1:nrow(fixed.effects.contrasts3b)) {
+  contrast.mat <- matrix(fixed.effects.contrasts3b[r, ], nrow = 1)
+  df <- pbkrtest::get_Lb_ddf(mr3, contrast.mat)
+  pt.est <- lme4::fixef(mr3) %*% t(contrast.mat)
+  vcov.est <- contrast.mat %*% vcovadj %*% t(contrast.mat)
+  sd.est <- sqrt(vcov.est)
+  t.stat <- sqrt(as.numeric(pt.est %*% solve(vcov.est) %*% t(pt.est)))
+  t.stat <- ifelse(pt.est < 0, -1*t.stat, t.stat)
+  p.val <- 2*pt(abs(t.stat), df, lower.tail = F)
+  model.fixef.results3b[r, c("parameter", "ci", "pval")] <- c(param.names[r],
+                                                              paste0("(", round(pt.est - sd.est*qt(1 - alpha/2, df, lower.tail = T), digits),
+                                                                     ", ", round(pt.est + sd.est*qt(1 - alpha/2, df, lower.tail = T), digits), ")"),
+                                                              ifelse(round(p.val, pval.digits) == 0, p.val.ub, round(p.val, pval.digits)))
+  model.fixef.results3b[r, c("estimate", "den.df", "tstat")] <- round(c(pt.est, df, t.stat), digits)
+}
+
+write_csv(model.fixef.results3b, "tables/VPD_cellmeans_KR.csv")
+
+# Switch to plotable params
+params3 <-
+  model.fixef.results3b |>
+  separate(parameter, into = c("phase", "Time", "type"), sep = ":") |>
+  mutate(type = case_when(type == "VPD" ~ "slope",
+                          .default = "intercept"),
+         sig = ifelse(pval < 0.05, TRUE, FALSE),
+         sig = ifelse(type == "slope", sig, NA),
+         Time = factor(Time, levels = c("PD", "MD"))) |>
+  select(-ci, -den.df, -tstat, -pval) |>
+  pivot_wider(names_from = type, 
+              values_from = c(estimate, sig)) |>
+  select(-sig_intercept) |>
+  rename(sig = sig_slope, intercept = estimate_intercept, slope = estimate_slope)
+
+#### Make plot ####
 
 cols_gn <- brewer.pal(4, "Paired")
-display.brewer.pal(4, "Paired")
+# display.brewer.pal(4, "Paired")
 
 cols_div <- brewer.pal(7, "Spectral")
-display.brewer.pal(7, "Spectral")
+# display.brewer.pal(7, "Spectral")
 
 labs <- c(lapply(c("PD", "MD"), function(i) bquote(Psi[.(i)])))
 strip <- strip_themed(background_x = elem_list_rect(fill = c(cols_div[c(6,3)])))
 
 fig5a <-
-  wp_all |> 
+  wp_all2 |> 
   ggplot() +
-  geom_point(aes(x = Dmean, y = value, color = period2)) +
-  geom_abline(data = params1,
-              aes(slope = slopes, intercept = ints,
-                  color = period2)) +
-  geom_text(data = lab1,
-            aes(x = -1, y = -5.5, label = label),
-            parse = TRUE,
-            hjust = 0) +
+  geom_point(aes(x = SWP, y = value, color = Time)) +
+  geom_abline(data = params2,
+              aes(slope = slope, intercept = intercept,
+                  color = Time,
+                  lty = sig)) +
+  # geom_text(data = lab1,
+  #           aes(x = -1, y = -5.5, label = label),
+  #           parse = TRUE,
+  #           hjust = 0) +
   scale_y_continuous(expression(paste(Psi[leaf], " (MPa)"))) +
-  scale_x_continuous("VPD (kPa)") +
+  scale_x_continuous(expression(paste(Psi[soil], " (MPa)"))) +
   scale_color_manual(values = cols_gn[4:3], 
-                     label = labs) +
+                     label = c("PD", "MD")) +
+  scale_linetype_manual(values = c("dashed", "solid")) +  
+  facet_wrap2(~phase, strip = strip, scales = "free_x") +
+  theme_bw(base_size = 14) +
+  theme(panel.grid = element_blank(),
+        legend.title = element_blank(),
+        legend.position = c(0.1, 0.2),
+        legend.background = element_blank()) +
+  guides(color = guide_legend(override.aes = list(linetype = c(0, 0))),
+         linetype = "none")
+
+fig5b <-
+  wp_all2 |> 
+  ggplot() +
+  geom_point(aes(x = VPD, y = wp_resids, color = Time)) +
+  geom_abline(data = params3,
+              aes(slope = slope, intercept = intercept,
+                  color = Time,
+                  lty = sig)) +
+  # geom_text(data = lab1,
+  #           aes(x = -1, y = -5.5, label = label),
+  #           parse = TRUE,
+  #           hjust = 0) +
+  scale_y_continuous(expression(paste(Psi[resids], " (MPa)"))) +
+  scale_x_continuous("VPD (kPa)") +
+  scale_color_manual(values = cols_gn[4:3]) +
+  scale_linetype_manual(values = c("dashed", "solid")) +  
   facet_wrap2(~phase, strip = strip) +
-             # scales = "free_x") +
   theme_bw(base_size = 14) +
   theme(panel.grid = element_blank(),
         legend.title = element_blank(),
         legend.position = c(0.1, 0.4),
         legend.background = element_blank()) +
-  guides(color = guide_legend(override.aes = list(linetype = c(0, 0))))
-
-fig5b <-
-  wp_all |> 
-  ggplot() +
-  geom_point(aes(x = SWP_1, y = value, color = period2)) +
-  geom_abline(data = params2,
-              aes(slope = slopes, intercept = ints,
-                  color = period2,
-                  lty = sig)) +
-  geom_text(data = lab2,
-            aes(x = c(0, -1), y = -5.5, label = label),
-            parse = TRUE,
-            hjust = 1) +
-  scale_y_continuous(expression(paste(Psi[leaf], " (MPa)"))) +
-  scale_x_continuous(expression(paste(Psi[soil], " (MPa)"))) +
-  scale_color_manual(values = cols_gn[4:3]) +
-  scale_linetype_manual(values = c("dashed", "solid")) +  
-  facet_wrap2(~phase, strip = strip,
-              scales = "free_x") +
-  theme_bw(base_size = 14) +
-  theme(panel.grid = element_blank(),
-        legend.title = element_blank()) +
   guides(color = "none",
          linetype = "none")
 
 fig5 <- plot_grid(fig5a, fig5b, 
-          ncol = 1,
-          align = "v",
-          labels = "auto")
+                  ncol = 1,
+                  align = "v",
+                  labels = "auto")
 
 ggsave(filename = "fig_scripts/fig5.png",
        plot = fig5,
        height = 4.5,
        width = 6,
-       units = "in")
-
-
-#### Output tables ####
-
-tidy(mm1) |>
-  filter(effect == "fixed") |>
-  select(-effect, -group) |>
-  mutate(across(estimate:p.value, ~round(.x, 3)),
-                sig = ifelse(p.value < 0.05, TRUE, FALSE)) |>
-  write_csv(file = "tables/VPD_phase.csv")
-
-tidy(mm2) |>
-  filter(effect == "fixed") |>
-  select(-effect, -group) |>
-  mutate(across(estimate:p.value, ~round(.x, 3)),
-         sig = ifelse(p.value < 0.05, TRUE, FALSE)) |>
-  write_csv(file = "tables/SWP_phase.csv")
-
-
-#### Test lms with model comparison (OLD) ####
-
-# Used backward selection with AIC as guidance
-# 3 out of 4 models used the additive model 
-# (different ints but same slope)
-# So use for all 4 panels?
-
-m1_start <- lm(value ~ Dmean*period2, data = wp_phase |> 
-                 filter(phase == "Phase 1"))
-m1_step <- stepAIC(m1_start, scope = list(lower = ~period2),
-                   direction = "backward",
-                   trace = 2)
-m1_step$anova
-m1 <- lm(value ~ Dmean + period2, data = wp_phase |> 
-           filter(phase == "Phase 1"))
-summary(m1) # all 3 are significant
-cf1 <- coef(m1)
-
-m2_start <- lm(value ~ Dmean*period2, data = wp_phase |> 
-                 filter(phase == "Phase 2"))
-m2_step <- stepAIC(m2_start, scope = list(lower = ~period2),
-                   direction = "backward",
-                   trace = 2)
-m2_step$anova
-m2 <- lm(value ~ Dmean + period2, data = wp_phase |> 
-           filter(phase == "Phase 2"))
-
-summary(m2) # only single intercept + Dmean slope
-cf2 <- coef(m2)
-
-cf_D <- data.frame(period2 = rep(c("PD", "MD"), 2),
-                   phase = rep(c("Phase 1", "Phase 2"), each = 2),
-                   int = c(cf1[1], cf1[1] + cf1[3], cf2[1], cf2[1]),
-                   slope = c(cf1[2], cf1[2], cf2[2], cf2[2])) |> 
-  mutate(period2 = factor(period2, levels = c("PD", "MD")))
-
-
-
-m3_start <- lm(value ~ SWP_1*period2, data = wp_phase |> 
-                 filter(phase == "Phase 1"))
-m3_step <- stepAIC(m3_start, scope = list(lower = ~period2),
-                   direction = "backward",
-                   trace = 1)
-m3_step$anova
-m3 <- lm(value ~ SWP_1 + period2, data = wp_phase |> 
-           filter(phase == "Phase 1"))
-summary(m3)
-cf3 <- coef(m3)
-
-m4_start <- lm(value ~ SWP_1*period2, data = wp_phase |> 
-                 filter(phase == "Phase 2"))
-m4_step <- stepAIC(m4_start, scope = list(lower = ~period2),
-                   direction = "backward",
-                   trace = 2)
-m4_step$anova
-m4 <- lm(value ~ SWP_1 + period2, data = wp_phase |> 
-           filter(phase == "Phase 2"))
-summary(m4) # intercept not significant
-cf4 <- coef(m4)
-
-cf_SWP <- data.frame(period2 = rep(c("PD", "MD"), 2),
-                     phase = rep(c("Phase 1", "Phase 2"), each = 2),
-                     int = c(cf3[1], cf3[1] + cf3[3], 0, 0 + cf4[3]),
-                     slope = c(0, 0, cf4[2], cf4[2])) |> 
-  mutate(period2 = factor(period2, levels = c("PD", "MD")))
-
-# Model comparison 
-
-mc_D <- broom::glance(m1) |> 
-  bind_rows(broom::glance(m2)) |> 
-  mutate(phase = c("Phase 1", "Phase 2"),
-         r2 = paste0("italic(R^2) == ", 
-                     round(adj.r.squared, 3)))
-
-mc_SWP <- broom::glance(m3) |> 
-  bind_rows(broom::glance(m4)) |> 
-  mutate(phase = c("Phase 1", "Phase 2"),
-         r2 = paste0("italic(R^2) == ", 
-                     round(adj.r.squared, 3)))
+       units = "in")  
 
