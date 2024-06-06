@@ -85,6 +85,13 @@ write_csv(gst, file = "data_clean/gs_leaftemp.csv")
 
 gst <- read_csv(file = "data_clean/gs_leaftemp.csv")
 
+# Get time ranges of rounds
+gst |>
+  group_by(round) |>
+  summarize(st = min(time_char)/60/60,
+            mean = mean(time_char)/60/60,
+            en = max(time_char)/60/60)
+
 # Quick plot timeseries of gs
 gst |> 
   ggplot(aes(x = dt.x,
