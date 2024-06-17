@@ -108,7 +108,7 @@ vwc_long <- env |>
   mutate(ID = paste0(house1, plot1),
          plot = as.numeric(str_extract(plot1, "\\d")),
          house = as.numeric(str_extract(house1, "\\d")),
-         depth = case_when(depth1 == 1 ~ "0-12 cm",
+         depth = case_when(depth1 == 1 ~ "0-10 cm",
                            depth1 == 2 ~ "25 cm",
                            depth1 == 3 ~ "75 cm")) |> 
   select(-ends_with("1")) |> 
@@ -117,7 +117,7 @@ vwc_long <- env |>
   mutate(trt = paste0("W", Winter, "S", Summer),
          summer = paste0("S", Summer)) |> 
   select(-Winter, -Summer) |> 
-  mutate(SWP = case_when(depth == "0-12 cm" ~ vwc2swp(VWC, param = "depth10cm"),
+  mutate(SWP = case_when(depth == "0-10 cm" ~ vwc2swp(VWC, param = "depth10cm"),
                          depth == "25 cm" ~ vwc2swp(VWC, param = "depth25cm"),
                          depth == "75 cm" ~ vwc2swp(VWC, param = "depth25cm")))
 
