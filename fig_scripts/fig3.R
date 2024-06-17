@@ -82,7 +82,7 @@ vwc <- read_csv("data_clean/vwc_daily_daytime.csv") |>
 ####  A) LWP + SWP ####
 
 labs <- c(lapply(c("PD", "MD"), function(i) bquote(Psi[.(i)])),
-          lapply(c("0-12 cm", "25 cm"), function(i) bquote(Psi[.(i)])))
+          lapply(c("0-10 cm", "25 cm"), function(i) bquote(Psi[.(i)])))
 
 cols_br_gn <- brewer.pal(7, "BrBG")
 display.brewer.pal(7, "BrBG")
@@ -128,7 +128,7 @@ figa <- ggplot() +
                             as.Date("2023-09-03"), 
                             by = 7)) +
   scale_color_manual(values = c(rev(RColorBrewer::brewer.pal(4, "Paired"))[1:2], cols_br_gn[1], cols_br_gn[1]),
-                     breaks = c("PD", "MD", "0-12 cm", "25 cm"),
+                     breaks = c("PD", "MD", "0-10 cm", "25 cm"),
                      labels = labs) +
   scale_linetype_manual(values = c("solid", "dashed")) +
   theme_bw(base_size = 14) +
@@ -145,7 +145,7 @@ figa <- ggplot() +
                                                   linetype = c(1, 1, 1, 2))))
 #### B) RWC + VWC ####
 labs2 <- c(lapply(c("PD", "MD"), function(i) bquote(RWC[.(i)])),
-           lapply(c("0-12 cm", "25 cm"), function(i) bquote(Theta[.(i)])))
+           lapply(c("0-10 cm", "25 cm"), function(i) bquote(Theta[.(i)])))
 
 
 cols_br_gn <- brewer.pal(7, "BrBG")
@@ -194,7 +194,7 @@ figb <-  ggplot() +
                             as.Date("2023-09-03"), 
                             by = 7)) +
   scale_color_manual(values = c(rev(RColorBrewer::brewer.pal(4, "Paired"))[1:2], cols_br_gn[2], cols_br_gn[2]), 
-                     breaks = c("PD", "MD", "0-12 cm", "25 cm"),
+                     breaks = c("PD", "MD", "0-10 cm", "25 cm"),
                      labels = labs2) +
   scale_linetype_manual(values = c("solid", "dashed")) +
   theme_bw(base_size = 14) +

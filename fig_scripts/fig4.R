@@ -29,13 +29,13 @@ vpd <- read_csv("data_clean/vpd_daily_daytime.csv") |>
 swp <- read_csv("data_clean/swp_daily_daytime.csv") |> 
   filter(period == "morn",
          summer == "S4",
-         depth %in% c("0-12 cm", "25 cm"),
+         depth %in% c("0-10 cm", "25 cm"),
          date >= min(temp$date_col),
          date <= max(temp$date_col)) |> 
   select(-period, -sd, depth) |> 
   pivot_wider(names_from = depth,
               values_from = mean) |>
-  rename(trt_s = summer, SWP_1 = `0-12 cm`, SWP_2 = `25 cm`) |> 
+  rename(trt_s = summer, SWP_1 = `0-10 cm`, SWP_2 = `25 cm`) |> 
   mutate(days_since_pulse = 0:21)
 
 # Load coda_params
@@ -86,7 +86,7 @@ cols_div <- brewer.pal(7, "Spectral")
 display.brewer.pal(7, "Spectral")
 
 # Create labels 
-labs <- c(lapply(c("PD", "0-12 cm"), function(i) bquote(Psi[.(i)])),
+labs <- c(lapply(c("PD", "0-10 cm"), function(i) bquote(Psi[.(i)])),
           lapply(c("PD"), function(i) bquote(VPD[.(i)])))
 
 

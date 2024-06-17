@@ -10,9 +10,9 @@ library(ggh4x)
 swp <- read_csv("data_clean/swp_daily_daytime.csv") |>
   filter(period == "morn",
          summer %in% c("S1", "S2", "S4"),
-         depth %in% c("0-12 cm", "25 cm")) |>
-  mutate(phase = case_when(depth == "0-12 cm" & mean > -1 ~ "Phase 1",
-                           depth == "0-12 cm" & mean <= -1 ~ "Phase 2",
+         depth %in% c("0-10 cm", "25 cm")) |>
+  mutate(phase = case_when(depth == "0-10 cm" & mean > -1 ~ "Phase 1",
+                           depth == "0-10 cm" & mean <= -1 ~ "Phase 2",
                            depth == "25 cm" & mean > -1 ~ "Phase 1",
                            depth == "25 cm" & mean <= -1 ~ "Phase 2"),
          trt_label = case_when(summer == "S1" ~ "P3.5",
@@ -34,8 +34,8 @@ num_text <- swp |>
   count() |>
   bind_rows(temp) |>
   mutate(lab = paste0(n, " days"),
-         y = case_when(depth == "0-12 cm" & phase == "Phase 1" ~ 0.3,
-                       depth == "0-12 cm" & phase == "Phase 2" ~ -3.7,
+         y = case_when(depth == "0-10 cm" & phase == "Phase 1" ~ 0.3,
+                       depth == "0-10 cm" & phase == "Phase 2" ~ -3.7,
                        depth == "25 cm" & phase == "Phase 1" ~ 0,
                        depth == "25 cm" & phase == "Phase 2" ~ -2),
          trt_label = factor(trt_label, levels = c("P3.5", "P7", "P21")))
@@ -45,13 +45,13 @@ num_total <- swp |>
   select(-period, -mean, -sd) |>
   pivot_wider(names_from = depth, 
               values_from = phase) |>
-  mutate(phase_total = ifelse(`0-12 cm` == "Phase 1" | `25 cm` == "Phase 1",
+  mutate(phase_total = ifelse(`0-10 cm` == "Phase 1" | `25 cm` == "Phase 1",
                               "Phase 1", "Phase 2")) |>
   group_by(trt_label) |>
   count(phase_total)
 
 # Establish SWP thresholds by depth
-thresh <- data.frame(depth = c("0-12 cm", "25 cm"),
+thresh <- data.frame(depth = c("0-10 cm", "25 cm"),
                      swp_thresh = c(-1, -1)) # should it be the same?
 
 # Make plot
@@ -59,7 +59,7 @@ cols_div <- brewer.pal(7, "Spectral")
 display.brewer.pal(7, "Spectral")
 
 swp_temp <- swp |>
-  mutate(ymin = case_when(depth == "0-12 cm" ~ -1,
+  mutate(ymin = case_when(depth == "0-10 cm" ~ -1,
                           depth == "25 cm" ~ -1)) # should it be the same?
 
 fig7 <-
@@ -118,7 +118,7 @@ ggsave(filename = "fig_scripts/fig8.png",
 
 # Days either layer is above threshold
 swp |>
-  mutate(above = case_when(depth == "0-12 cm" & mean > -1 |
+  mutate(above = case_when(depth == "0-10 cm" & mean > -1 |
                              depth == "25 cm" & mean > -0.6 ~ TRUE,
                            .default = FALSE)) |>
   group_by(summer, date) |>
@@ -131,7 +131,7 @@ temp <- swp |>
   select(-sd, -phase) |>
   pivot_wider(names_from = depth,
               values_from = mean) |>
-  rename(SWP_1 = '0-12 cm', SWP_2 = '25 cm') |>
+  rename(SWP_1 = '0-10 cm', SWP_2 = '25 cm') |>
   mutate(bottom_only = if_else(SWP_1 <= -1 & SWP_2 > -0.6, TRUE, FALSE)) |>
   group_by(summer) |>
   summarize(bottom_total = sum(bottom_only))
