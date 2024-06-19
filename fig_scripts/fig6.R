@@ -17,7 +17,7 @@ swp <- read_csv("data_clean/swp_daily_daytime.csv") |>
   filter(period == "morn",
          date >= min(hyp_ind$date_col),
          date <= max(hyp_ind$date_col),
-         depth == "0-12 cm",
+         depth == "0-10 cm",
          summer != "S3") |> 
   rename(trt_s = summer,
          SWP_1 = mean) |> 
@@ -225,7 +225,7 @@ fig_a <-
   scale_color_manual(values = cols_gn[4:3], 
                        label = labs) +  
   scale_x_continuous(expression(paste(RWC, " (g", " ", g^-1, ")"))) +
-  scale_y_continuous(expression(paste(Psi, " (MPa)"))) +
+  scale_y_continuous(expression(paste(Psi[leaf], " (MPa)"))) +
   theme_bw(base_size = 14) +
   theme(panel.grid = element_blank()) +
   guides(color = "none")

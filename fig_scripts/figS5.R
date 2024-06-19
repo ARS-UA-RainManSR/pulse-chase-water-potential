@@ -14,7 +14,7 @@ swp <- read_csv("data_clean/swp_daily_daytime.csv") |>
   filter(period == "morn",
          date >= min(hyp_ind$date_col),
          date <= max(hyp_ind$date_col),
-         depth == "0-12 cm",
+         depth == "0-10 cm",
          summer != "S3") |> 
   rename(trt_s = summer,
          SWP_1 = mean) |> 
@@ -114,9 +114,9 @@ fig <- preds |>
             aes(x = -.5, y = -9.5, label = lab2),
             parse = TRUE,
             hjust = 1) +
-  scale_x_continuous(expression(paste("Phase 2 observed ", Psi, " (MPa)")),
+  scale_x_continuous(expression(paste("Phase 2 observed ", Psi[leaf], " (MPa)")),
                      limits = c(-10, 0)) +
-  scale_y_continuous(expression(paste("Phase 2 predicted ", Psi, " (MPa)")),
+  scale_y_continuous(expression(paste("Phase 2 predicted ", Psi[leaf], " (MPa)")),
                      limits = c(-10, 0)) +
   scale_color_manual(values = cols_gn[4:3], 
                      label = labs) +  
