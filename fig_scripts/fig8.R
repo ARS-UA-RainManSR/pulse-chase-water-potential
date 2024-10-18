@@ -117,22 +117,22 @@ ggsave(filename = "fig_scripts/fig8.png",
 # Calculate duration? consecutive days?
 
 # Days either layer is above threshold
+# Using consistent threshold of -1
 swp |>
-  mutate(above = case_when(depth == "0-10 cm" & mean > -1 |
-                             depth == "25 cm" & mean > -0.6 ~ TRUE,
-                           .default = FALSE)) |>
+  mutate(above = ifelse(mean > -1, TRUE, FALSE)) |>
   group_by(summer, date) |>
   summarize(above_temp = max(above)) |>
   group_by(summer) |>
-  summarize(phase1 = sum(above_temp))
+  summarize(phase1 = sum(above_temp)) |>
+  mutate(perc = phase1/83)
 
 # Days top is dry but 25 cm is above threshold
-temp <- swp |>
+swp |>
   select(-sd, -phase) |>
   pivot_wider(names_from = depth,
               values_from = mean) |>
   rename(SWP_1 = '0-10 cm', SWP_2 = '25 cm') |>
-  mutate(bottom_only = if_else(SWP_1 <= -1 & SWP_2 > -0.6, TRUE, FALSE)) |>
+  mutate(bottom_only = if_else(SWP_1 <= -1 & SWP_2 > -1, TRUE, FALSE)) |>
   group_by(summer) |>
   summarize(bottom_total = sum(bottom_only))
 
