@@ -4,6 +4,7 @@
 library(tidyverse)
 library(ggh4x)
 library(cowplot)
+library(RColorBrewer)
 
 # load data files
 # indices from hyperspectral
