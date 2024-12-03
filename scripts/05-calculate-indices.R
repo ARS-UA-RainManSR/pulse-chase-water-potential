@@ -192,8 +192,7 @@ for(i in 1:length(dates)){
   # Penuelas et al. 1995
   df_wide$PRI <- calc_VI(df_wide, 531, 531, 570, 570) #literature derived PRI bands
   
-  # From Caine et al. 2024 PCE
-  
+
   # WBI - water band index
   # Penuelas et al. 1993, R970/R900
   df_wide$WBI <- calc_SR(df_wide, 970, 970, 900, 900)
@@ -211,8 +210,13 @@ for(i in 1:length(dates)){
   df_wide$RWC_ind <- calc_SR(df_wide, 1430, 1430, 1850, 1850)
   
   # CNDI - combined nitrogen and drought index
-  # Cainet al. 2024, R1353/(R706 + R1402 + R1451 + R1878)
+  # Caine et al. 2024, R1353/(R706 + R1402 + R1451 + R1878)
   df_wide$CNDI <- calc_complex(df_wide, 1353, 1353, 706, 706, 1402, 1402, 1451, 1451, 1878, 1878)
+  
+  # NRI_1620_1410, diurnal, NRI_2160_2090
+  # Juntilla et al. 2022
+  df_wide$NRI_1620_1410 <- calc_VI(df_wide, 1620, 1620, 1410, 1410) 
+  df_wide$NRI_2160_2090 <- calc_VI(df_wide, 2160, 2160, 2090, 2090) 
   
   #write csv file
   out <- cbind.data.frame(date_id,
@@ -226,6 +230,7 @@ for(i in 1:length(dates)){
                           df_wide$WPI1, df_wide$WPI2, # from Mertens et al. 2021
                           df_wide$RWC_ind, # from Yu et al. 2000
                           df_wide$CNDI, # from Caine et al. 2024
+                          df_wide$NRI_1620_1410, df_wide$NRI_2160_2090, # from Juntilla et al. 2022
                           wp_id, rwc_id)
   
   colnames(out) <- c('Date', 'ID', 'House', 'Plot', 'Treat', 'Winter', 'Summer', 'Time',
@@ -234,6 +239,7 @@ for(i in 1:length(dates)){
                    'WPI1', 'WPI2',
                    'RWC_ind',
                    'CNDI',
+                   'NRI_1620_1410', 'NRI_2160_2090',
                    'WP', 'RWC')
   
   write_csv(out, paste0('data/hyperspec_1/Indices_Rep1_',folders[i],".csv"))
@@ -278,7 +284,7 @@ out <- merged |>
 
 # write_csv(out, paste0('data_clean/hyp_indices.csv'))
 # Fix treatment labels
-out <- read_csv("data_clean/hyp_indices.csv")
+# out <- read_csv("data_clean/hyp_indices.csv")
 table(out$ID, out$trt) # some mismatches in H1
 
 trt <- readxl::read_excel("data/treatments.xlsx") |>
