@@ -48,7 +48,14 @@ hyp_sum <- hyp |>
             RWC_ind_n = sum(length(!is.na(RWC_ind))),
             CNDI_m = mean(CNDI, na.rm = TRUE),
             CNDI_sd = sd(CNDI, na.rm = TRUE),
-            CNDI_n = sum(length(!is.na(CNDI))))
+            CNDI_n = sum(length(!is.na(CNDI))),
+            NRI_1620_1410_m = mean(NRI_1620_1410, na.rm = TRUE),
+            NRI_1620_1410_sd = sd(NRI_1620_1410, na.rm = TRUE),
+            NRI_1620_1410_n = sum(length(!is.na(NRI_1620_1410))),
+            NRI_2160_2090_m = mean(NRI_2160_2090, na.rm = TRUE),
+            NRI_2160_2090_sd = sd(NRI_2160_2090, na.rm = TRUE),
+            NRI_2160_2090_n = sum(length(!is.na(NRI_2160_2090)))                     
+            )
 
 # WBI
 figa <- ggplot() +
@@ -283,6 +290,95 @@ ggsave(filename = "fig_scripts/figS4.png",
        width = 6,
        units = "in")
 
+# NRI_1620_1410
+ggplot() +
+  geom_vline(data = irig,
+             aes(xintercept = date),
+             lty = "dotted")  +
+  geom_point(data = hyp,
+             aes(x = date_col,
+                 y = NRI_1620_1410,
+                 color = period2),
+             alpha = 0.25,
+             position = "jitter") +
+  geom_errorbar(data = hyp_sum,
+                aes(x = date_col,
+                    ymin = NRI_1620_1410_m - NRI_1620_1410_sd,
+                    ymax = NRI_1620_1410_m + NRI_1620_1410_sd,
+                    color = period2),
+                alpha = 0.5, width = 0.75) +
+  geom_point(data = hyp_sum,
+             aes(x = date_col,
+                 y = NRI_1620_1410_m,
+                 color = period2),
+             size = 2.5) +
+  geom_line(data = hyp_sum,
+            aes(x = date_col,
+                y = NRI_1620_1410_m,
+                color = period2,
+                group = interaction(pulse_num2, period2))) +
+  scale_x_date(date_labels = "%b %d",
+               breaks = seq(as.Date("2023-08-14"),
+                            as.Date("2023-09-04"), 
+                            by = 7)) +
+  scale_color_manual(values = RColorBrewer::brewer.pal(4, "Paired")[4:3]) +
+  facet_grid(cols = vars(trt_s),
+             scales = "free_x",
+             space = "free_x") +
+  theme_bw(base_size = 14) +
+  theme(axis.title.x = element_blank(),
+        panel.grid = element_blank(),
+        strip.background = element_blank(),
+        legend.title = element_blank(),
+        legend.position = c(0.85, 0.85),
+        legend.text = element_text(size = 8),
+        legend.background = element_rect(fill = NA))
+
+# NRI_2160_2090
+ggplot() +
+  geom_vline(data = irig,
+             aes(xintercept = date),
+             lty = "dotted")  +
+  geom_point(data = hyp,
+             aes(x = date_col,
+                 y = NRI_2160_2090,
+                 color = period2),
+             alpha = 0.25,
+             position = "jitter") +
+  geom_errorbar(data = hyp_sum,
+                aes(x = date_col,
+                    ymin = NRI_2160_2090_m - NRI_2160_2090_sd,
+                    ymax = NRI_2160_2090_m + NRI_2160_2090_sd,
+                    color = period2),
+                alpha = 0.5, width = 0.75) +
+  geom_point(data = hyp_sum,
+             aes(x = date_col,
+                 y = NRI_2160_2090_m,
+                 color = period2),
+             size = 2.5) +
+  geom_line(data = hyp_sum,
+            aes(x = date_col,
+                y = NRI_2160_2090_m,
+                color = period2,
+                group = interaction(pulse_num2, period2))) +
+  scale_x_date(date_labels = "%b %d",
+               breaks = seq(as.Date("2023-08-14"),
+                            as.Date("2023-09-04"), 
+                            by = 7)) +
+  scale_color_manual(values = RColorBrewer::brewer.pal(4, "Paired")[4:3]) +
+  facet_grid(cols = vars(trt_s),
+             scales = "free_x",
+             space = "free_x") +
+  theme_bw(base_size = 14) +
+  theme(axis.title.x = element_blank(),
+        panel.grid = element_blank(),
+        strip.background = element_blank(),
+        legend.title = element_blank(),
+        legend.position = c(0.85, 0.85),
+        legend.text = element_text(size = 8),
+        legend.background = element_rect(fill = NA))
+
+
 ##### Scatterplots ####
 
 # Join with long format of rwc and wp
@@ -354,6 +450,33 @@ figS5 <- plot_grid(fig1, fig2, fig3, fig4,
                    ncol = 2,
                    align = "v",
                    labels = "auto")
+
+# NRI
+hyp_long |>
+  ggplot(aes(x = NRI_1620_1410, y = value)) +
+  geom_point(aes(color = period2)) +
+  facet_wrap(~variable, scales = "free_y",
+             strip.position = "left") +
+  scale_color_manual(values = RColorBrewer::brewer.pal(4, "Paired")[4:3]) +
+  guides(color = "none") +
+  theme_bw(base_size = 14) +
+  theme(panel.grid = element_blank(),
+        strip.background = element_blank(),
+        strip.placement = "outside",
+        axis.title.y = element_blank())
+
+hyp_long |>
+  ggplot(aes(x = NRI_2160_2090, y = value)) +
+  geom_point(aes(color = period2)) +
+  facet_wrap(~variable, scales = "free_y",
+             strip.position = "left") +
+  scale_color_manual(values = RColorBrewer::brewer.pal(4, "Paired")[4:3]) +
+  guides(color = "none") +
+  theme_bw(base_size = 14) +
+  theme(panel.grid = element_blank(),
+        strip.background = element_blank(),
+        strip.placement = "outside",
+        axis.title.y = element_blank())
 
 # Calculate means and add to existing bivariate plots
 hyp_long_sum <- hyp_long |>
@@ -464,6 +587,33 @@ hyp_long |>
         strip.background = element_blank(),
         strip.placement = "outside",
         axis.title.y = element_blank())
+
+hyp_long |>
+  ggplot() +
+  geom_point(aes(x = NRI_1620_1410, y = value, color = period2),
+             alpha =  0.25) +
+  geom_errorbar(data = hyp_long_sum,
+                aes(x = NRI_1620_1410_m,
+                    ymin = var_m - var_sd, ymax = var_m + var_sd,
+                    col = period2)) +
+  geom_errorbarh(data = hyp_long_sum,
+                 aes(xmin = NRI_1620_1410_m - NRI_1620_1410_sd, 
+                     xmax = NRI_1620_1410_m + NRI_1620_1410_sd,
+                     y = var_m,
+                     col = period2)) +
+  geom_point(data = hyp_long_sum,
+             aes(x = NRI_1620_1410_m, y = var_m, col = period2),
+             size = 2) +
+  facet_wrap(~variable, scales = "free_y",
+             strip.position = "left") +
+  scale_color_manual(values = RColorBrewer::brewer.pal(4, "Paired")[4:3]) +
+  guides(color = "none") +
+  theme_bw(base_size = 14) +
+  theme(panel.grid = element_blank(),
+        strip.background = element_blank(),
+        strip.placement = "outside",
+        axis.title.y = element_blank())
+
 
 #### Matched time series plots ####
 
