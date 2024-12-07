@@ -478,3 +478,35 @@ intersect(tent_plots$plot, pulse_plots$plot)
 
 # Three plots in common, which shared W2S4 treatments
 # The other three pulse plots were W3W4, to gain sufficient DICA for sampling
+
+#### Remake for AGU ####
+fig6_top <- plot_grid(fig6a, fig6c, fig6e,
+                    nrow = 1, 
+                    align = "h")
+
+fig6_bottom <- plot_grid(fig6b, fig6d, fig6f,
+                    nrow = 1, 
+                    align = "h")
+
+fig6_AGU1 <- plot_grid(fig6_top, fig6_bottom,
+                  ncol = 1,
+                  align = "h")
+
+fig6_partial <- plot_grid(fig6e, fig6g,
+                   ncol = 1,
+                   rel_widths = c(1, 1.2),
+                   align = "v",
+                   axis = "lr")
+
+ggsave(filename = "fig_scripts/fig7_AGUa.png",
+       plot = fig6_AGU1,
+       height = 5,
+       width = 9,
+       units = "in")
+
+ggsave(filename = "fig_scripts/fig7_AGUb.png",
+       plot = fig6_partial,
+       height = 5,
+       width = 3.65,
+       units = "in")
+

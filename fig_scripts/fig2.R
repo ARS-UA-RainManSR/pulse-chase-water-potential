@@ -152,3 +152,58 @@ ggsave("fig_scripts/fig2.png",
        height = 4,
        width = 10,
        units = "in")
+#### Version of fig_b with only VWC for AGU talk
+fig_c <- ggplot() +
+  geom_rect(data = pulse,
+            aes(xmin = st, xmax = en,
+                ymin = -Inf, ymax = Inf),
+            alpha = 0.1) +
+  geom_line(data = vwc,
+            aes(x = date, y = mean,
+                color = "VWC",
+                lty = depth)) +
+  scale_y_continuous(expression(paste(Theta, " (", cm^3, " ", cm^-3, ")")),
+                     breaks = c(0, 0.05, 0.10)) +
+  # geom_line(data = swp,
+  #           aes(x = date, y = (mean + 2.7)/20, # 15 and 2 also work well, but show negative vwc's
+  #               color = "SWP",
+  #               lty = depth)) +
+  # scale_y_continuous(expression(paste(Theta, " (", cm^3, " ", cm^-3, ")")),
+  #                    sec.axis = sec_axis(~.*20-2.7,
+  #                                        expression(paste(Psi[soil], " (MPa)")))) +
+  scale_x_date(breaks = as.Date(c("2023-08-14", "2023-08-21", 
+                                  "2023-08-28")),
+               date_labels = "%b %d") +
+  scale_color_manual(values = cols_br_gn[2],
+                     label = labs) +
+  scale_linetype_manual(values = c("solid", "longdash")) +
+  facet_grid(cols = vars(trt_label),
+             rows = vars(depth),
+             scales = "free_y",
+             space = "free_y") +
+  guides(linetype = "none",
+         color = "none") +
+  theme_bw(base_size = 14) +
+  theme(panel.grid = element_blank(),
+        # strip.placement.x = "outside",
+        legend.title = element_blank(),
+        legend.position = c(0.25, 0.93),
+        legend.background = element_blank(),
+        legend.text = element_text(size = 12),
+        legend.key.size = unit(0.35, "cm"),
+        strip.background.x = element_blank(),
+        strip.background.y = element_rect(fill = "transparent"),
+        axis.title.x = element_blank(),
+        axis.title.y.left = element_text(color = cols_br_gn[2]),
+        axis.title.y.right = element_text(color = cols_br_gn[1]))
+
+fig2b <- plot_grid(fig_a, fig_c, ncol = 2,
+                  rel_widths = c(1, 3),
+                  align = "h", axis = "bt",
+                  labels = "auto")
+
+ggsave("fig_scripts/fig2_AGU.png",
+       fig2b,
+       height = 4,
+       width = 10,
+       units = "in")
