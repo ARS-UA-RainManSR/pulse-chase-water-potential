@@ -1,10 +1,12 @@
 # First figure
 # pull SRM met data for long-term monthly means
 # 2023 daily values + soil moisture treatments
+# Round 2: reduce to only sampling period
 
 library(tidyverse)
 library(plantecophys)
 library(cowplot)
+library(RColorBrewer)
 
 #### Fig A - SRM ####
 srm23 <- read_csv("data/srm/US-SRM_HH_202212312330_202312312330.csv",
@@ -252,8 +254,64 @@ fig_b
 #           ncol = 1,
 #           labels = "auto")
 
-ggsave("fig_scripts/fig1.png",
-       fig_b,
+# Save b only
+# ggsave("fig_scripts/fig1.png",
+#        fig_b,
+#        height = 3.5,
+#        width = 8,
+#        units = "in")
+
+# Output version with only August pulse chase
+fig_c <- env |> 
+  ggplot() +
+  geom_rect(data = pulse, 
+            aes(xmin = st, xmax = en,
+                ymin = -Inf, ymax = Inf),
+            alpha = 0.1) +
+  geom_point(data = wp_dates,
+             aes(x = date_col, y = 60),
+             shape = 4, size = 3) +
+  geom_ribbon(aes(x = date, ymin = Tmin, ymax = Tmax),
+              alpha = 0.5,
+              fill = "gray70") +
+  geom_line(aes(x = date, y = Tmean)) +
+  geom_line(aes(x = date, y = Dmean*12),
+            color = "coral") +
+  geom_col(data = irig_long |>  filter(trt_s != "S3"),
+           aes(x = date,
+               y = irig, 
+               fill = trt_label),
+           width = 1.5,
+           position = position_dodge(width = 1.4)) +
+  scale_x_date(limits = c(as.Date("2023-08-13"),
+                          as.Date("2023-09-05")),
+               breaks = as.Date(c("2023-08-14", 
+                                  "2023-08-21",
+                                  "2023-08-28",
+                                  "2023-09-04")),
+               date_minor_breaks = "day",
+               date_labels = "%b %d") +
+  scale_y_continuous(expression(paste(T[air], " (°C) | irrigation (mm)")),
+                     sec.axis = sec_axis(~./12,
+                                         "VPD (kPa)")) +
+  scale_fill_manual(values = cols_bl) +
+  labs(fill = "Treatment") +
+  theme_bw(base_size = 14) +
+  theme(panel.grid = element_blank(),
+        axis.title.x = element_blank(),
+        axis.title.y.right = element_text(color = "coral"),
+        legend.position = "bottom",
+        # legend.position.inside = c(0.08, 0.8),
+        legend.text = element_text(size = 10),
+        legend.title = element_text(size = 12),
+        legend.background = element_blank())
+
+fig1c <- plot_grid(fig_c, align = "v",
+                            ncol = 1,
+                            labels = "auto")
+
+ggsave("fig_scripts/round2/fig1.png",
+       fig1c,
        height = 3.5,
-       width = 8,
+       width = 4,
        units = "in")
