@@ -37,14 +37,18 @@ fig_a <- wp4 |>
   geom_line(data = mrc,
             aes(x = vwc, y = -swp, color = Depth)) +
   scale_x_continuous(expression(paste(Theta, " (", cm^3, " ", cm^-3, ")"))) +
-  scale_y_continuous(expression(paste(Psi[soil], " (-MPa)"))) +
+  scale_y_continuous(expression(paste(Psi[soil], " (-MPa)")),
+                     limits = c(0, 4)) +
   scale_color_manual(values = cols_pur[2:1]) +
   theme_bw(base_size = 14) +
   theme(panel.grid = element_blank(),
-        legend.position = c(0.65, 0.9),
+        legend.position = "inside",
+        legend.position.inside = c(0.65, 0.9),
         legend.title = element_blank(),
         legend.text = element_text(size = 12),
         legend.background = element_blank())
+
+fig_a
 
 #### Fig B: SWP and VWC timeseries ####
 
@@ -147,7 +151,7 @@ fig2 <- plot_grid(fig_a, fig_b, ncol = 2,
           align = "h", axis = "bt",
           labels = "auto")
 
-ggsave("fig_scripts/fig2.png",
+ggsave("fig_scripts/round2/fig2.png",
        fig2,
        height = 4,
        width = 10,

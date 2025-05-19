@@ -310,7 +310,7 @@ fig1c <- plot_grid(fig_c, align = "v",
                             ncol = 1,
                             labels = "auto")
 
-ggsave("fig_scripts/round2/fig1.png",
+ggsave("fig_scripts/round2/fig1a.png",
        fig1c,
        height = 3.5,
        width = 4,
