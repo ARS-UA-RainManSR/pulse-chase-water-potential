@@ -37,6 +37,7 @@ vpd_daytime <- vpd |>
             D_outside_day_mean = mean(D_outside, na.rm = TRUE),
             D_outside_day_sd = sd(D_outside, na.rm = TRUE))
 
+# Predawn 0400 to 0600
 vpd_PD <- vpd |> 
   mutate(date = as.Date(TIMESTAMP, tz = "America/Phoenix"),
          hr = hour(TIMESTAMP) + minute(TIMESTAMP)/60) |> 
@@ -47,6 +48,7 @@ vpd_PD <- vpd |>
             D_outside_PD_mean = mean(D_outside, na.rm = TRUE),
             D_outside_PD_sd = sd(D_outside, na.rm = TRUE))
 
+# Midday 1100 to 1300
 vpd_MD <- vpd |> 
   mutate(date = as.Date(TIMESTAMP, tz = "America/Phoenix"),
          hr = hour(TIMESTAMP) + minute(TIMESTAMP)/60) |> 
@@ -57,10 +59,23 @@ vpd_MD <- vpd |>
             D_outside_MD_mean = mean(D_outside, na.rm = TRUE),
             D_outside_MD_sd = sd(D_outside, na.rm = TRUE))
 
+# Morning 0630 to 1100
+vpd_morn <- vpd |> 
+  mutate(date = as.Date(TIMESTAMP, tz = "America/Phoenix"),
+         hr = hour(TIMESTAMP) + minute(TIMESTAMP)/60) |> 
+  filter(hr >= 6.5, hr <= 11) |>  # set morn as between 6:30 am and 11 am
+  group_by(date) |> 
+  summarize(D_inside_morn_mean = mean(D_inside, na.rm = TRUE),
+            D_inside_morn_sd = sd(D_inside, na.rm = TRUE),
+            D_outside_morn_mean = mean(D_outside, na.rm = TRUE),
+            D_outside_morn_sd = sd(D_outside, na.rm = TRUE))
+
+
 vpd_comb <- vpd_daily |> 
   left_join(vpd_daytime, by = join_by("date")) |> 
   left_join(vpd_PD, by = join_by("date")) |> 
   left_join(vpd_MD, by = join_by("date")) |> 
+  left_join(vpd_morn, by = join_by("date")) |> 
   pivot_longer(starts_with("D_"),
                names_to = c("location", "period", "type"),
                names_pattern = "D_(.*)_(.*)_(.*)",
