@@ -36,7 +36,7 @@ swp <- read_csv("data_clean/swp_daily_daytime.csv") |>
   filter(period == "morn",
          date >= min(wp$date_col),
          date <= max(wp$date_col),
-         depth == "0-12 cm",
+         depth == "0-10 cm",
          summer != "S3") |> 
   rename(trt_s = summer,
          SWP_1 = mean) |> 
@@ -174,6 +174,8 @@ for(r in 1:nrow(fixed.effects.contrasts2b)) {
 write_csv(model.fixef.results2b, "tables/SWP_cellmeans_KR.csv")
 
 # Switch to plotable params
+model.fixef.results2b <- read_csv("tables/SWP_cellmeans_KR.csv")
+
 params2 <- model.fixef.results2b |>
   separate(parameter, into = c("phase", "term"), sep = ":") |>
   uncount(c(1,1,2,1,1,2)) |>
@@ -267,6 +269,8 @@ for(r in 1:nrow(fixed.effects.contrasts3b)) {
 write_csv(model.fixef.results3b, "tables/VPD_cellmeans_KR.csv")
 
 # Switch to plotable params
+model.fixef.results3b <- read_csv("tables/VPD_cellmeans_KR.csv")
+
 params3 <-
   model.fixef.results3b |>
   separate(parameter, into = c("phase", "Time", "type"), sep = ":") |>
@@ -297,7 +301,7 @@ fig5a <-
   ggplot() +
   geom_point(aes(x = SWP, y = value, color = Time)) +
   geom_abline(data = params2,
-              aes(slope = slope, intercept = intercept,
+              aes(slope = -slope, intercept = intercept,
                   color = Time,
                   lty = sig)) +
   # geom_text(data = lab1,
@@ -305,7 +309,7 @@ fig5a <-
   #           parse = TRUE,
   #           hjust = 0) +
   scale_y_continuous(expression(paste(Psi[leaf], " (MPa)"))) +
-  scale_x_continuous(expression(paste(Psi[soil], " (MPa)"))) +
+  scale_x_reverse(expression(paste(Psi[soil], " (MPa)"))) +
   scale_color_manual(values = cols_gn[4:3], 
                      label = c("PD", "MD")) +
   scale_linetype_manual(values = c("dashed", "solid")) +  
@@ -348,7 +352,7 @@ fig5 <- plot_grid(fig5a, fig5b,
                   align = "v",
                   labels = "auto")
 
-ggsave(filename = "fig_scripts/fig5.png",
+ggsave(filename = "fig_scripts/round2/fig5.png",
        plot = fig5,
        height = 4.5,
        width = 6,
