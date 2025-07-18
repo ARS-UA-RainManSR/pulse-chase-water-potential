@@ -434,6 +434,57 @@ fig6g <-
         legend.position = c(0.8, 0.8)) +
   guides(shape = guide_legend(override.aes = list(color = c("black", "darkcyan"))))
 
+
+## 6h gsonly
+fig6h <-
+  ggplot() +
+  geom_rect(data = cps,
+            aes(xmin = pred.lower, xmax = pred.upper,
+                ymin = -Inf, ymax = Inf),
+            color = "gray90", alpha = 0.15) +
+  geom_point(data = gst,
+             aes(x = days_since_pulse,
+                 y = gs),
+             alpha = 0.25) +
+  geom_errorbar(data = gst_sum,
+                aes(x = days_since_pulse, 
+                    ymin = (gs_m - gs_sd),
+                    ymax = (gs_m + gs_sd)),
+                width = 0) +
+  geom_point(data = gst_sum,
+             aes(x = days_since_pulse,
+                 y = gs_m),
+             size = 2) +
+  geom_line(data = gst_sum,
+            aes(x = days_since_pulse, 
+                y = gs_m)) +
+  geom_vline(data = cps,
+             aes(xintercept = pred.mean),
+             lty = "longdash") +
+  scale_x_continuous("Days since P21 pulse") +
+  scale_y_continuous(expression(paste(g[s], " (mmol ", H[2], "O ", m^-2, " ", s^-1, ")"))) +
+  scale_shape_manual(values = c(16)) +
+  guides(color = "none",
+         shape = "none") +
+  theme_bw(base_size = 14) +
+  theme(panel.grid = element_blank(),
+        legend.title = element_blank(),
+        legend.background = element_blank(),
+        legend.position = c(0.8, 0.8))
+
+fig6h
+#### combine for round2, only fluxes ####
+fig6_round2 <- plot_grid(fig6h, fig6e, fig6f,
+                    ncol = 3,
+                    align = "h",
+                    labels = "auto")
+fig6_round2
+ggsave(filename = "fig_scripts/round2/fig6.png",
+       plot = fig6_round2,
+       height = 3,
+       width = 8,
+       units = "in")
+
 ##### combine #####
 fig6_1 <- plot_grid(fig6a, fig6c, fig6e,
                     ncol = 1, 
