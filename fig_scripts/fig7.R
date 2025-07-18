@@ -1,512 +1,229 @@
-# Stack of S4 pulse responses across variables
-# Note where the changespoints are across all plots
+# Associate gas exchange fluxes against SWP and maybe VPD
 
-library(coda)
-library(broom.mixed)
 library(tidyverse)
+library(cowplot)
 library(RColorBrewer)
 library(ggh4x)
-library(cowplot)
-
-# Need LWP, RWC, NDVI, PRI, GPP, and ET
-# 2.0 version subs RWCind for NDVI and add gs to the ET panel
-# as well as location of changepoints
-# no env data needed
-
-# Load coda_params
-load("scripts/mod4 - piecewise/coda/coda_params_mod1.Rdata")
-
-# Summarize
-param_sum <- tidyMCMC(coda_params,
-                      conf.int = TRUE,
-                      conf.method = "HPDinterval") |>
-  rename(pred.mean = estimate,
-         pred.lower = conf.low,
-         pred.upper = conf.high)
-
-# Obtain posterior summary of changepoints
-cps <- param_sum |> 
-  filter(grepl("^mu\\.cp", term))
-cp1 <- cps[1,]
-cp2 <- cps[2,]
-
-# Load leaf phys data
-wp <- read_csv("data_clean/wp_rwc_long.csv") |>
-  filter(variable == "WP",
-         trt_s == "S4") |>
-  mutate(period = case_when(period == "predawn" ~ "PD",
-                            period == "midday" ~ "MD") |>
-           factor(levels = c("PD", "MD")), 
-         days_since_pulse = if_else(date_col == as.Date("2023-09-04"),
-                                    21, days_since_pulse))
 
 
-wp_sum <- wp |>
-  group_by(days_since_pulse, period) |>
-  summarize(WP_m = mean(value),
-            WP_sd = sd(value))
+# Load SWP
+swp <- read_csv("data_clean/swp_daily_daytime.csv") |> 
+  filter(period == "morn",
+         depth == "0-10 cm",
+         summer != "S3",
+         date >= as.Date("2023-08-14", tz = "America/Phoenix"),
+         date <= as.Date("2023-09-04", tz = "America/Phoenix")) |>
+  mutate(trt_label = case_when(summer == "S1" ~ "P3.5",
+                               summer == "S2" ~ "P7",
+                               summer == "S4" ~ "P21") |>
+           factor(levels = c("P3.5", "P7", "P21")))
 
-rwc <- read_csv("data_clean/wp_rwc_long.csv") |>
-  filter(variable == "RWC",
-         trt_s == "S4") |>
-  mutate(period = case_when(period == "predawn" ~ "PD",
-                            period == "midday" ~ "MD") |>
-           factor(levels = c("PD", "MD")),
-         days_since_pulse = if_else(date_col == as.Date("2023-09-04"),
-                                    21, days_since_pulse))
+# Load VPD
+vpd <- read_csv("data_clean/vpd_daily_daytime.csv") |> 
+  filter(location == "inside",
+         period == "morn",
+         !is.na(mean)) |>  
+  dplyr::select(-location) |> 
+  rename(D_morn_mean = mean, D_morn_sd = sd)
 
-
-rwc_sum <- rwc |>
-  group_by(days_since_pulse, period) |>
-  summarize(RWC_m = mean(value),
-            RWC_sd = sd(value))
-
-# Load gs data
-# 2-3 rounds - average across rounds first
-# join with days since pulse
-dsp <- wp |>
-  select(date_col, days_since_pulse) |>
-  distinct()
-
+# Load gs
 gst <- read_csv(file = "data_clean/gs_leaftemp.csv",
                 locale = locale(tz = "America/Phoenix")) |>
   rename(ID = hp) |>
   mutate(date_col = as.Date(date)) |>
   group_by(date_col, trt_s, ID) |>
-  summarize(gs = mean(conductance)) |>
-  filter(trt_s == "S4") |>
-  left_join(dsp, by = join_by(date_col))
+  summarize(gs = mean(conductance)) |> 
+  left_join(swp, by = join_by(trt_s == summer, date_col == date)) |> 
+  select(-depth, -period) |> 
+  rename(swp_0_10_mean = mean,
+         swp_0_10_sd = sd) |> 
+  left_join(vpd, join_by(date_col == date)) |> 
+  select(-period)
+
 
 gst_sum <- gst |>
-  group_by(days_since_pulse) |>
+  group_by(trt_s, date_col) |>
   summarize(gs_m = mean(gs),
-            gs_sd = sd(gs))
-
-
-# Load spectral indices
-# days since pulse
-dsp <- wp |>
-  select(date_col, days_since_pulse) |>
-  distinct()
-
-rwc_ind <- read_csv("data_clean/hyp_indices.csv") |> 
-  filter(trt_s == "S4") |>
-  mutate(date_col = as.Date(date_col, "%m/%d/%Y", tz = "America/Phoenix")) |>
-  select(1:5, trt_s, ID, RWC_ind) |>
-  left_join(dsp) |>
-  mutate(period = case_when(period == "predawn" ~ "PD",
-                            period == "midday" ~ "MD") |>
-           factor(levels = c("PD", "MD")))
-
-rwc_ind_sum <- rwc_ind |>
-  group_by(days_since_pulse, period) |>
-  summarize(RWC_ind_m = mean(RWC_ind),
-            RWC_ind_sd = sd(RWC_ind))
-
-pri <- read_csv("data_clean/hyp_indices.csv") |> 
-  filter(trt_s == "S4") |>
-  mutate(date_col = as.Date(date_col, "%m/%d/%Y", tz = "America/Phoenix")) |>
-  select(1:5, trt_s, ID, PRI) |>
-  left_join(dsp) |>
-  mutate(period = case_when(period == "predawn" ~ "PD",
-                            period == "midday" ~ "MD") |>
-           factor(levels = c("PD", "MD")))
-
-
-pri_sum <- pri |>
-  group_by(days_since_pulse, period) |>
-  summarize(pri_m = mean(PRI),
-            pri_sd = sd(PRI))
+            gs_sd = sd(gs)) |>
+  left_join(swp, by = join_by(trt_s == summer, date_col == date)) |> 
+  select(-depth, -period) |> 
+  rename(swp_0_10_mean = mean,
+         swp_0_10_sd = sd) |> 
+  left_join(vpd, join_by(date_col == date)) |> 
+  select(-period)
 
 # Load GPP
 gpp <- read_csv("data/plotgas2023.csv") |>
   mutate(date_col = lubridate::mdy(Date,
-                                   tz = "America/Phoenix"),
+                                   tz = "America/Phoenix") |> 
+           as.Date(),
          ER2 = ifelse(ER < 0, 0, ER), # Restrict ER to positive values
-         GPP = -NEE + ER2) |> 
-  filter(PT == "S4",
-         date_col >= min(wp$date_col),
-         date_col <= max(wp$date_col)) |>
-  left_join(dsp)
+         GPP = -NEE + ER2,
+         house = str_extract(Plot, "H[0-9]")) |> 
+  filter(date_col >= min(swp$date),
+         date_col <= max(swp$date)) |> 
+  left_join(swp, by = join_by(PT == summer, date_col == date)) |> 
+  select(-depth, -period) |> 
+  rename(swp_0_10_mean = mean,
+         swp_0_10_sd = sd) |> 
+  left_join(vpd, join_by(date_col == date)) |> 
+  select(-period)
+
 
 gpp_sum <- gpp |>
-  group_by(days_since_pulse) |>
+  group_by(PT, date_col) |>
   summarize(gpp_m = mean(GPP),
             gpp_sd = sd(GPP),
             et_m = mean(ET),
-            et_sd = sd(ET))
+            et_sd = sd(ET)) |> 
+  left_join(swp, by = join_by(PT == summer, date_col == date)) |> 
+  select(-depth, -period) |> 
+  rename(swp_0_10_mean = mean,
+         swp_0_10_sd = sd) |> 
+  left_join(vpd, join_by(date_col == date)) |> 
+  select(-period)
 
 
-gpp_sum |>
-  ggplot(aes(x = days_since_pulse)) +
-  geom_point(data = gpp,
-             aes(y = GPP),
-             alpha = 0.25) +
-  geom_errorbar(aes(x = days_since_pulse,
-                    ymin = gpp_m - gpp_sd,
-                    ymax = gpp_m + gpp_sd),
-                width = 0) +
-  geom_point(aes(x = days_since_pulse, y = gpp_m)) +
-  geom_line(aes(x = days_since_pulse, y = gpp_m)) +
-  theme_bw()
+# Energy vs water limited
+# Create single dataframe to facet by variable and phase
 
-# Assemble panels
-cols_gn <- brewer.pal(4, "Paired")
+all_sum <- gst_sum |> 
+  full_join(gpp_sum, by = join_by(trt_s == PT, date_col, trt_label,
+                                  swp_0_10_mean, swp_0_10_sd, 
+                                  D_morn_mean, D_morn_sd)) |> 
+  pivot_longer(cols = c("gs_m", "gs_sd",
+                        "gpp_m", "gpp_sd",
+                        "et_m", "et_sd"),
+               names_to = c("flux", "variable"),
+               names_pattern = "(.*)_(.*)",
+               values_to = "value") |> 
+  pivot_wider(names_from = variable,
+              values_from = value) |> 
+  mutate(phase = if_else(swp_0_10_mean > -1, "Phase 1", "Phase 2"),
+         flux = factor(flux, levels = c("gpp", "et", "gs")),
+         level = if_else(flux == "gs", "leaf", "plot"))
 
-##### WP #####
-fig6a <- wp |>
+my_labeller <- as_labeller(c(gs = "g[s]~(mmol~H[2]*O~m^-2~s^-1)",
+                             et = "ET~(mmol~H[2]*O~m^-2~s^-1)",
+                             gpp = "GPP~(mu*mol~CO[2]~m^-2~s^-1)",
+                             `Phase 1` = "Phase~1",
+                             `Phase 2` = "Phase~2"),
+                           default = label_parsed)
+strip <- strip_themed(background_x = elem_list_rect(fill = c(cols_div[c(6,3)])))
+
+cols_bl <- brewer.pal(9, "Blues")[c(9,7,4)]
+
+# first plot with only treatments colored
+fig_7 <- all_sum |> 
   ggplot() +
-  geom_rect(data = cps,
-            aes(xmin = pred.lower, xmax = pred.upper,
-                ymin = -Inf, ymax = Inf),
-            color = "gray90", alpha = 0.15) +
-  geom_point(aes(x = days_since_pulse,
-                 y = value,
-                 color = period),
-             alpha = 0.25) +
-  geom_errorbar(data = wp_sum,
-                aes(x = days_since_pulse, 
-                    ymin = WP_m - WP_sd,
-                    ymax = WP_m + WP_sd,
-                    color = period),
-                width = 0) +
-  geom_point(data = wp_sum,
-             aes(x = days_since_pulse,
-                 y = WP_m,
-                 color = period),
-             size = 2) +
-  geom_line(data = wp_sum,
-            aes(x = days_since_pulse, 
-                y = WP_m,
-                color = period)) +
-  geom_vline(data = cps,
-             aes(xintercept = pred.mean),
-             lty = "longdash") +
-  scale_x_continuous("Days since P21 pulse") +
-  scale_y_continuous(expression(paste(Psi[leaf], " (MPa)"))) +
-  scale_color_manual(values = cols_gn[c(4,3)]) +
-  guides(color = guide_legend(override.aes = list(linetype = 0))) +
-  theme_bw(base_size = 14) +
+  geom_errorbar(aes(x = swp_0_10_mean,
+                    ymin = m - sd,
+                    ymax = m + sd,
+                    color = trt_label),
+                alpha = 0.5) +
+  geom_point(aes(x = swp_0_10_mean,
+                 y = m,
+                 color = trt_label,
+                 shape = level),
+             size = 3) +
+  scale_shape_manual(values = c(19, 15)) +
+  scale_color_manual("Treatment", values = cols_bl) +
+  scale_x_reverse(expression(paste(Psi[soil], " (MPa)"))) +
+  facet_grid2(rows = vars(flux),
+              cols = vars(phase),
+              strip = strip,
+              scales = "free",
+              space = "free_x",
+              labeller = my_labeller,
+              switch = "y") +
+  theme_bw(base_size = 12) +
   theme(panel.grid = element_blank(),
-        legend.title = element_blank(),
-        legend.position = c(0.3, 0.2),
-        legend.background = element_blank())
-
-##### RWC #####
-fig6b <- rwc |>
-  ggplot() +
-  geom_rect(data = cps,
-            aes(xmin = pred.lower, xmax = pred.upper,
-                ymin = -Inf, ymax = Inf),
-            color = "gray90", alpha = 0.15) +
-  geom_point(aes(x = days_since_pulse,
-                 y = value,
-                 color = period),
-             alpha = 0.25) +
-  geom_errorbar(data = rwc_sum,
-                aes(x = days_since_pulse, 
-                    ymin = RWC_m - RWC_sd,
-                    ymax = RWC_m + RWC_sd,
-                    color = period),
-                width = 0) +
-  geom_point(data = rwc_sum,
-             aes(x = days_since_pulse,
-                 y = RWC_m,
-                 color = period),
-             size = 2) +
-  geom_line(data = rwc_sum,
-            aes(x = days_since_pulse, 
-                y = RWC_m,
-                color = period)) +
-  geom_vline(data = cps,
-             aes(xintercept = pred.mean),
-             lty = "longdash") +
-  scale_x_continuous("Days since P21 pulse") +
-  scale_y_continuous(expression(paste("RWC (g ", g^-1, ")"))) +
-  scale_color_manual(values = cols_gn[c(4,3)]) +
-  guides(color = "none") +
-  theme_bw(base_size = 14) +
-  theme(panel.grid = element_blank())
-
-##### PRI #####
-fig6c <- pri |>
-  ggplot() +
-  geom_rect(data = cps,
-            aes(xmin = pred.lower, xmax = pred.upper,
-                ymin = -Inf, ymax = Inf),
-            color = "gray90", alpha = 0.15) +
-  geom_point(aes(x = days_since_pulse,
-                 y = PRI,
-                 color = period),
-             alpha = 0.25) +
-  geom_errorbar(data = pri_sum,
-                aes(x = days_since_pulse, 
-                    ymin = pri_m - pri_sd,
-                    ymax = pri_m + pri_sd,
-                    color = period),
-                width = 0) +
-  geom_point(data = pri_sum,
-             aes(x = days_since_pulse,
-                 y = pri_m,
-                 color = period),
-             size = 2) +
-  geom_line(data = pri_sum,
-            aes(x = days_since_pulse, 
-                y = pri_m,
-                color = period)) +
-  geom_vline(data = cps,
-             aes(xintercept = pred.mean),
-             lty = "longdash") +
-  scale_x_continuous("Days since P21 pulse") +
-  scale_y_continuous("PRI") +
-  scale_color_manual(values = cols_gn[c(4,3)]) +
-  guides(color = "none") +
-  theme_bw(base_size = 14) +
-  theme(panel.grid = element_blank())
-
-##### RWC_ind #####
-fig6d <-
-  rwc_ind |>
-  ggplot() +
-  geom_rect(data = cps,
-            aes(xmin = pred.lower, xmax = pred.upper,
-                ymin = -Inf, ymax = Inf),
-            color = "gray90", alpha = 0.15) +
-  geom_point(aes(x = days_since_pulse,
-                 y = RWC_ind,
-                 color = period),
-             alpha = 0.25) +
-  geom_errorbar(data = rwc_ind_sum,
-                aes(x = days_since_pulse, 
-                    ymin = RWC_ind_m - RWC_ind_sd,
-                    ymax = RWC_ind_m + RWC_ind_sd,
-                    color = period),
-                width = 0) +
-  geom_point(data = rwc_ind_sum,
-             aes(x = days_since_pulse,
-                 y = RWC_ind_m,
-                 color = period),
-             size = 2) +
-  geom_line(data = rwc_ind_sum,
-            aes(x = days_since_pulse, 
-                y = RWC_ind_m,
-                color = period)) +
-  geom_vline(data = cps,
-             aes(xintercept = pred.mean),
-             lty = "longdash") +
-  scale_x_continuous("Days since P21 pulse") +
-  scale_y_reverse(expression(paste(RWC[ind]))) +
-  scale_color_manual(values = cols_gn[c(4,3)]) +
-  guides(color = "none") +
-  theme_bw(base_size = 14) +
-  theme(panel.grid = element_blank())
-
-
-##### GPP #####
-fig6e <- gpp |>
-  ggplot() +
-  geom_rect(data = cps,
-            aes(xmin = pred.lower, xmax = pred.upper,
-                ymin = -Inf, ymax = Inf),
-            color = "gray90", alpha = 0.15) +
-  geom_point(aes(x = days_since_pulse,
-                 y = GPP,
-                 shape = "gpp"),
-             alpha = 0.25) +
-  geom_errorbar(data = gpp_sum,
-                aes(x = days_since_pulse, 
-                    ymin = gpp_m - gpp_sd,
-                    ymax = gpp_m + gpp_sd),
-                width = 0) +
-  geom_point(data = gpp_sum,
-             aes(x = days_since_pulse,
-                 y = gpp_m,
-                 shape = "gpp"),
-             size = 2) +
-  geom_line(data = gpp_sum,
-            aes(x = days_since_pulse, 
-                y = gpp_m)) +
-  geom_vline(data = cps,
-             aes(xintercept = pred.mean),
-             lty = "longdash") +
-  scale_x_continuous("Days since P21 pulse") +
-  scale_y_continuous(expression(paste("GPP (", mu, "mol ", CO[2], " ", m^-2, s^-1, ")"))) +
-  scale_shape_manual(values = 15) +
-  guides(color = "none",
-         shape = "none") +
-  theme_bw(base_size = 14) +
-  theme(panel.grid = element_blank())
-
-## 6f - ET only
-fig6f <- gpp |>
-  ggplot() +
-  geom_rect(data = cps,
-            aes(xmin = pred.lower, xmax = pred.upper,
-                ymin = -Inf, ymax = Inf),
-            color = "gray90", alpha = 0.15) +
-  geom_point(aes(x = days_since_pulse,
-                 y = ET),
-             alpha = 0.25) +
-  geom_errorbar(data = gpp_sum,
-                aes(x = days_since_pulse, 
-                    ymin = et_m - et_sd,
-                    ymax = et_m + et_sd),
-                width = 0) +
-  geom_point(data = gpp_sum,
-             aes(x = days_since_pulse,
-                 y = et_m),
-             size = 2) +
-  geom_line(data = gpp_sum,
-            aes(x = days_since_pulse, 
-                y = et_m)) +
-  geom_vline(data = cps,
-             aes(xintercept = pred.mean),
-             lty = "longdash") +
-  scale_x_continuous("Days since P21 pulse") +
-  scale_y_continuous(expression(paste("ET (mmol ", H[2], O, " ", m^-2, s^-1, ")"))) +
-  guides(color = "none") +
-  theme_bw(base_size = 14) +
-  theme(panel.grid = element_blank())
-
-## 6g ET + gs
-fig6g <-
-  gpp |>
-  ggplot() +
-  geom_rect(data = cps,
-            aes(xmin = pred.lower, xmax = pred.upper,
-                ymin = -Inf, ymax = Inf),
-            color = "gray90", alpha = 0.15) +
-  geom_point(aes(x = days_since_pulse,
-                 y = ET,
-                 shape = "et"),
-             alpha = 0.25) +
-  geom_point(data = gst,
-             aes(x = days_since_pulse,
-                 y = gs/50,
-                 color = "gs",
-                 shape = "gs"),
-             alpha = 0.25) +
-  geom_errorbar(data = gpp_sum,
-                aes(x = days_since_pulse, 
-                    ymin = et_m - et_sd,
-                    ymax = et_m + et_sd),
-                width = 0) +
-  geom_errorbar(data = gst_sum,
-                aes(x = days_since_pulse, 
-                    ymin = (gs_m - gs_sd)/50,
-                    ymax = (gs_m + gs_sd)/50,
-                    color = "gs"),
-                width = 0) +
-  geom_point(data = gpp_sum,
-             aes(x = days_since_pulse,
-                 y = et_m,
-                 shape = "et"),
-             size = 2) +
-  geom_point(data = gst_sum,
-             aes(x = days_since_pulse,
-                 y = gs_m/50,
-                 color = "gs",
-                 shape = "gs"),
-             size = 2) +
-  geom_line(data = gpp_sum,
-            aes(x = days_since_pulse, 
-                y = et_m)) +
-  geom_line(data = gst_sum,
-            aes(x = days_since_pulse, 
-                y = gs_m/50,
-                color = "gs")) +
-  geom_vline(data = cps,
-             aes(xintercept = pred.mean),
-             lty = "longdash") +
-  scale_x_continuous("Days since P21 pulse") +
-  scale_y_continuous(expression(paste("ET (mmol ", H[2], O, " ", m^-2, s^-1, ")")),
-                     sec.axis = sec_axis(~.*50, 
-                                         expression(paste(g[s], " (mmol ", H[2], "O ", m^-2, " ", s^-1, ")")))) +
-  scale_shape_manual(values = c(15, 16),
-                     labels = c("plot", "leaf")) +
-  scale_color_manual(values = "darkcyan") +
-  guides(color = "none") +
-  theme_bw(base_size = 14) +
-  theme(panel.grid = element_blank(),
-        axis.title.y.right = element_text(color = "darkcyan"),
-        legend.title = element_blank(),
+        strip.background = element_blank(),
         legend.background = element_blank(),
-        legend.position = c(0.8, 0.8)) +
-  guides(shape = guide_legend(override.aes = list(color = c("black", "darkcyan"))))
+        strip.placement = "outside",
+        axis.title.y = element_blank(),
+        strip.text = element_text(size = 12),
+        legend.position = "inside",
+        legend.position.inside = c(0.9, 0.9)) +
+  guides(color = guide_legend(override.aes = list(shape = 15,
+                                                  linetype = 0)),
+         shape = "none")
 
-##### combine #####
-fig6_1 <- plot_grid(fig6a, fig6c, fig6e,
-                    ncol = 1, 
-                    align = "v",
-                    labels = c("a", "c", "e"))
+fig_7
 
-fig6_2 <- plot_grid(fig6b, fig6d, fig6g,
-                  ncol = 1, 
-                  align = "v",
-                  labels = c("b", "d", "f"))
-fig6 <- plot_grid(fig6_1, fig6_2,
-                   ncol = 2,
-                   rel_widths = c(1, 1.2),
-                   align = "h")
-
-ggsave(filename = "fig_scripts/fig7.png",
-       plot = fig6,
+ggsave(filename = "fig_scripts/round2/fig7.png",
+       plot = fig_7,
        height = 7,
-       width = 7,
+       width = 8,
        units = "in")
 
-# Figure out which plots were used for S4 tent gas exchange
+# then try with treatment and VPD
+fig_7new <- all_sum |> 
+  ggplot() +
+  geom_errorbar(aes(x = swp_0_10_mean,
+                    ymin = m - sd,
+                    ymax = m + sd,
+                    color = D_morn_mean),
+                alpha = 0.5) +
+  geom_point(aes(x = swp_0_10_mean,
+                 y = m,
+                 color = D_morn_mean,
+                 shape = trt_label),
+             size = 3) +
+  scale_shape_manual("Treatment", values = c(19, 17, 15)) +
+  scale_color_gradient("VPD", low = "cornflowerblue", high = "coral") +
+  scale_x_reverse(expression(paste(Psi[soil], " (MPa)"))) +
+  facet_grid2(rows = vars(flux),
+              cols = vars(phase),
+              strip = strip,
+              scales = "free",
+              space = "free_x",
+              labeller = my_labeller,
+              switch = "y") +
+  theme_bw(base_size = 10) +
+  theme(panel.grid = element_blank(),
+        strip.background = element_blank(),
+        strip.placement = "outside",
+        axis.title.y = element_blank(),
+        strip.text = element_text(size = 10)) 
 
-tent_plots <- gpp |>
-  group_by(Plot) |>
-  summarize(orig = unique(Plot)) |>
-  mutate(plot = str_extract(orig, pattern = "H\\d{1}P\\d{2}"),
-         plot = case_when(plot == "H3P06" ~ "H3P6",
-                          plot == "H4P07" ~ "H4P7",
-                          plot == "H5P03" ~ "H5P3",
-                          .default = plot))
-tent_plots
-
-
-pulse_plots <-  wp |>
-  group_by(ID, trt_s, trt_w) |>
-  summarize(plot = unique(ID))
-
-pulse_plots
-
-intersect(tent_plots$plot, pulse_plots$plot)
-
-# Three plots in common, which shared W2S4 treatments
-# The other three pulse plots were W3W4, to gain sufficient DICA for sampling
-
-#### Remake for AGU ####
-fig6_top <- plot_grid(fig6a, fig6c, fig6e,
-                    nrow = 1, 
-                    align = "h")
-
-fig6_bottom <- plot_grid(fig6b, fig6d, fig6f,
-                    nrow = 1, 
-                    align = "h")
-
-fig6_AGU1 <- plot_grid(fig6_top, fig6_bottom,
-                  ncol = 1,
-                  align = "h")
-
-fig6_partial <- plot_grid(fig6e, fig6g,
-                   ncol = 1,
-                   rel_widths = c(1, 1.2),
-                   align = "v",
-                   axis = "lr")
-
-ggsave(filename = "fig_scripts/fig7_AGUa.png",
-       plot = fig6_AGU1,
-       height = 5,
-       width = 9,
+ggsave(filename = "fig_scripts/round2/fig7_v2.png",
+       plot = fig_7new,
+       height = 6,
+       width = 8,
        units = "in")
 
-ggsave(filename = "fig_scripts/fig7_AGUb.png",
-       plot = fig6_partial,
-       height = 5,
-       width = 3.65,
-       units = "in")
+# Modeling Phase 1
+phase1_flux <- gpp |> 
+  filter(swp_0_10_mean >= -1)
+
+phase1_gs <- gst |> 
+  filter(swp_0_10_mean >= -1)
+
+
+gpp |> 
+  filter(swp_0_10_mean >= -1) |> 
+  ggplot(aes(x = Par)) +
+  geom_point(aes(y = GPP,
+                 color = D_midday_mean,
+                 shape = house))
+
+m1 <- lm(GPP ~ scale(swp_0_10_mean) * scale(D_midday_mean), data = phase1_flux)
+summary(m1)
+
+m2 <- lm(gs ~ scale(swp_0_10_mean) * scale(D_midday_mean), data = phase1_gs)
+summary(m2)
+
+
+gpp |> 
+  filter(swp_0_10_mean >= -1) |> 
+  ggplot(aes(x = swp_0_10_mean)) +
+  geom_point(aes(y = ET,
+                 color = D_midday_mean,
+                 shape = house))
+m3 <- lm(ET ~ scale(swp_0_10_mean) * scale(Par), data = phase1_flux)
+summary(m3)
+
+cor(gpp$swp_0_10_mean, gpp$D_midday_mean)
+
 

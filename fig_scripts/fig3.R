@@ -138,7 +138,7 @@ figa <- ggplot() +
         legend.title = element_blank(),
         legend.position = "inside",
         legend.position.inside = c(0.25, 0.3),
-        legend.text = element_text(size = 8),
+        legend.text = element_text(size = 10),
         legend.background = element_rect(fill = NA)) +
   guides(linetype = "none",
          color = guide_legend(override.aes = list(shape = c(16, 16, NA, NA),
@@ -210,13 +210,13 @@ figb <-  ggplot() +
          color = guide_legend(override.aes = list(shape = c(16, 16, NA, NA),
                                                   linetype = c(1, 1, 1, 2))))
 
-fig3 <- plot_grid(figa, figb, nrow = 2,
-                  align = "v",
-                  labels = "auto")
+# fig3 <- plot_grid(figa, figb, nrow = 2,
+#                   align = "v",
+#                   labels = "auto")
 
-ggsave(filename = "fig_scripts/fig3.png",
-       plot = fig3,
-       height = 5,
+ggsave(filename = "fig_scripts/round2/fig3.png",
+       plot = figa,
+       height = 3,
        width = 8,
        units = "in")
 
