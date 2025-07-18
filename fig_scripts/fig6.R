@@ -346,7 +346,8 @@ fig6f <- gpp |>
             color = "gray90", alpha = 0.15) +
   geom_point(aes(x = days_since_pulse,
                  y = ET),
-             alpha = 0.25) +
+             alpha = 0.25,
+             shape = 15) +
   geom_errorbar(data = gpp_sum,
                 aes(x = days_since_pulse, 
                     ymin = et_m - et_sd,
@@ -355,7 +356,8 @@ fig6f <- gpp |>
   geom_point(data = gpp_sum,
              aes(x = days_since_pulse,
                  y = et_m),
-             size = 2) +
+             size = 2,
+             shape = 15) +
   geom_line(data = gpp_sum,
             aes(x = days_since_pulse, 
                 y = et_m)) +
@@ -474,7 +476,7 @@ fig6h <-
 
 fig6h
 #### combine for round2, only fluxes ####
-fig6_round2 <- plot_grid(fig6h, fig6e, fig6f,
+fig6_round2 <- plot_grid(fig6h, fig6f, fig6e,
                     ncol = 3,
                     align = "h",
                     labels = "auto")
@@ -482,7 +484,7 @@ fig6_round2
 ggsave(filename = "fig_scripts/round2/fig6.png",
        plot = fig6_round2,
        height = 3,
-       width = 8,
+       width = 9,
        units = "in")
 
 ##### combine #####
