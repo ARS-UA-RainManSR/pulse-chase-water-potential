@@ -10,6 +10,7 @@ library(RColorBrewer)
 library(broom)
 library(ggh4x)
 library(cowplot)
+library(lme4)
 
 # Load coda_params
 load("scripts/mod4 - piecewise/coda/coda_params_mod1.Rdata")
@@ -317,7 +318,8 @@ fig5a <-
   theme_bw(base_size = 14) +
   theme(panel.grid = element_blank(),
         legend.title = element_blank(),
-        legend.position = c(0.1, 0.2),
+        legend.position = "inside",
+        legend.position.inside = c(0.1, 0.2),
         legend.background = element_blank()) +
   guides(color = guide_legend(override.aes = list(linetype = c(0, 0))),
          linetype = "none")
