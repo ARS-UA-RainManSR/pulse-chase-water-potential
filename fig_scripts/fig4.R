@@ -77,6 +77,48 @@ ab2 <- param_sum |>
   filter(grepl("mu\\.a2", term) | grepl("mu\\.b\\[2", term)) |> 
   mutate(var = c("intercept", "slope"))
 
+# Calculate start and end segments
+x1 <- 0
+y1 <- as.numeric(ab1$pred.mean[1] + x1*ab1$pred.mean[2])
+x1; y1
+
+x2 <- as.numeric(cps$pred.mean[1])
+y2 <- as.numeric(maxy$pred.mean)
+x2; y2
+
+x3 <- as.numeric(cps$pred.mean[2])
+y3 <- as.numeric(maxy$pred.mean)
+x3; y3
+
+x4 <- 21
+y4 <- as.numeric(ab2$pred.mean[1] + x4*ab2$pred.mean[2])
+x4; y4
+
+# Make start and endpoints into dataframe
+segs <- data.frame(label = c("initial", "phase 1", "phase2"),
+                   x1 = c(x1, x2, x3),
+                   y1 = c(y1, y2, y3),
+                   x2 = c(x2, x3, x4),
+                   y2 = c(y2, y3, y4))
+
+# Calculate when SWP intersect cp2
+cp2 <- as.numeric(cps$pred.mean[2])
+floor(cp2);ceiling(cp2)
+swp_sub <- swp |> 
+  filter(days_since_pulse %in% 10:13)
+m_swp <- lm(SWP_1 ~ days_since_pulse, data = swp_sub)
+swp_pred <- cps |> 
+  filter(term == "mu.cp[2]") |> 
+  select(-term, -std.error) |> 
+  pivot_longer(1:3) |> 
+  rename(days_since_pulse = value) |> 
+  mutate(pred_swp = predict(m_swp, to_pred)) |> 
+  select(-days_since_pulse) |> 
+  pivot_wider(names_from = name, 
+              values_from = pred_swp)
+
+
+
 #  Establish colors
 cols_br_gn <- brewer.pal(7, "BrBG")
 display.brewer.pal(7, "BrBG")
@@ -105,32 +147,35 @@ fig4 <-  preds |>
   geom_line(data = swp, 
             aes(x = days_since_pulse, y = SWP_1,
                 color = "SWP_1"),
-            lty = "solid") +
-  # geom_line(data = swp, 
-  #           aes(x = days_since_pulse, y = SWP_2,
-  #               color = "SWP_2"),
-  #           lty = "longdash") +
-  geom_line(data = vpd, 
-            aes(x = days_since_pulse, y = Dmean-4.5,
-                color = "VPD")) +
-  geom_hline(data = maxy, 
-             aes(yintercept = pred.mean),
-             linetype = "dotted") +
+            lty = "solid",
+            size = 1) +
+  # geom_line(data = swp,
+  #           aes(x = days_since_pulse, y = SWP_2),
+  #           lty = "solid") +
+  geom_segment(data = segs, 
+               aes(x = x1, y = y1,
+                   xend = x2, yend = y2,
+                   color = "LWP"),
+               linetype = "dashed") +
   geom_rect(data = cps,
             aes(ymin = -Inf, ymax = Inf,
                 xmin = pred.lower, xmax = pred.upper),
-            color = "gray90", alpha = 0.15) +
+            fill = "gray90", alpha = 0.35,
+            linewidth = 0) +
   geom_vline(data = cps,
-             aes(xintercept = pred.mean)) +
-  geom_abline(slope = ab1$pred.mean[2],
-              intercept = ab1$pred.mean[1],
-              linetype = "dotted") +
-  geom_abline(slope = ab2$pred.mean[2],
-              intercept = ab2$pred.mean[1],
-              linetype = "dotted") +
+             aes(xintercept = pred.mean),
+             color = "gray50") +
+  geom_rect(data = swp_pred,
+            aes(ymin = pred.lower, ymax = pred.upper,
+                xmin = -Inf, xmax = Inf),
+            fill = "gray90", alpha = 0.35,
+            linewidth = 0) +
+  geom_hline(data = swp_pred,
+             aes(yintercept = pred.mean),
+             color = "gray50") +
   geom_point(aes(x = days_since_pulse, y = value,
                  color = "LWP"),
-             size = 2) +
+             size = 2.25) +
   geom_rect(data = phases,
             aes(xmin = xmin, xmax = xmax,
                 ymin = ymin, ymax = ymax, 
@@ -141,10 +186,10 @@ fig4 <-  preds |>
                 label = lab),
             vjust = 1, hjust = 0.5) +
   scale_y_continuous(expression(paste(Psi, " (MPa)")), 
-                     limits = c(-4.5, 0.5),
-                     sec.axis = sec_axis(~.+4.5, 
-                                         "VPD (kPa)",
-                                         breaks = 0:2)) +
+                     limits = c(-4.5, 0.5)) +
+                     # sec.axis = sec_axis(~.+4.5, 
+                     #                     "VPD (kPa)",
+                     #                     breaks = 0:2)) +
   scale_x_continuous(name = "Days since P21 pulse", 
                      minor_breaks = seq(0, 21, 1),
                      breaks = seq(0, 21, 3),
@@ -154,20 +199,20 @@ fig4 <-  preds |>
                      labels = labs) +
   scale_fill_manual(values = cols_div[c(3,6,3)]) +
   theme_bw(base_size = 12) +
-  theme(ggh4x.axis.ticks.length.minor = rel(1),
-        panel.grid = element_blank(),
+  theme(panel.grid = element_blank(),
+        # ggh4x.axis.ticks.length.minor = rel(1),
         legend.title = element_blank(),
         legend.position = "inside",
-        legend.position.inside = c(0.3, 0.3),
-        legend.background = element_blank(),
-        axis.title.y.right = element_text(color = "coral")) +
+        legend.position.inside = c(0.25, 0.1),
+        legend.background = element_blank()) +
+        # axis.title.y.right = element_text(color = "coral")) +
   guides(fill = "none",
-         color = guide_legend(override.aes = list(shape = c(16, NA, NA),
-                                                  linetype = c(NA, 1, 1))))
+         color = guide_legend(override.aes = list(shape = c(16, NA),
+                                                  linetype = c(NA, 1))))
 
+fig4
 
-
-ggsave(filename = "fig_scripts/fig4.png",
+ggsave(filename = "fig_scripts/round2/fig4.png",
        plot = fig4,
        height = 3.5,
        width = 6,
