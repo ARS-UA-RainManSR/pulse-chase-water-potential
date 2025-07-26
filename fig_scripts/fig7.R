@@ -1,4 +1,4 @@
-# Associate gas exchange fluxes against SWP and maybe VPD
+# Associate fluxes against SWP or PD and maybe VPD
 
 library(tidyverse)
 library(cowplot)
@@ -86,6 +86,8 @@ gpp_sum <- gpp |>
 
 # Energy vs water limited
 # Create single dataframe to facet by variable and phase
+cols_div <- brewer.pal(7, "Spectral")
+display.brewer.pal(7, "Spectral")
 
 all_sum <- gst_sum |> 
   full_join(gpp_sum, by = join_by(trt_s == PT, date_col, trt_label,
@@ -100,7 +102,7 @@ all_sum <- gst_sum |>
   pivot_wider(names_from = variable,
               values_from = value) |> 
   mutate(phase = if_else(swp_0_10_mean > -1, "Phase 1", "Phase 2"),
-         flux = factor(flux, levels = c("gpp", "et", "gs")),
+         flux = factor(flux, levels = c("gs", "et", "gpp")),
          level = if_else(flux == "gs", "leaf", "plot"))
 
 my_labeller <- as_labeller(c(gs = "g[s]~(mmol~H[2]*O~m^-2~s^-1)",
@@ -113,27 +115,27 @@ strip <- strip_themed(background_x = elem_list_rect(fill = c(cols_div[c(6,3)])))
 
 cols_bl <- brewer.pal(9, "Blues")[c(9,7,4)]
 
-# first plot with only treatments colored
+# first plot with only VPD shown (no treatment)
 fig_7 <- all_sum |> 
   ggplot() +
   geom_errorbar(aes(x = swp_0_10_mean,
                     ymin = m - sd,
                     ymax = m + sd,
-                    color = trt_label),
+                    color = D_morn_mean),
                 alpha = 0.5) +
   geom_point(aes(x = swp_0_10_mean,
                  y = m,
-                 color = trt_label,
+                 color = D_morn_mean,
                  shape = level),
              size = 3) +
-  scale_shape_manual(values = c(19, 15)) +
-  scale_color_manual("Treatment", values = cols_bl) +
+  scale_color_gradient("VPD", low = "cornflowerblue", high = "coral") +
+  scale_shape_manual(values = c(16, 15)) +
   scale_x_reverse(expression(paste(Psi[soil], " (MPa)"))) +
   facet_grid2(rows = vars(flux),
               cols = vars(phase),
               strip = strip,
               scales = "free",
-              space = "free_x",
+              # space = "free_x",
               labeller = my_labeller,
               switch = "y") +
   theme_bw(base_size = 12) +
@@ -143,19 +145,110 @@ fig_7 <- all_sum |>
         strip.placement = "outside",
         axis.title.y = element_blank(),
         strip.text = element_text(size = 12),
-        legend.position = "inside",
-        legend.position.inside = c(0.9, 0.9)) +
-  guides(color = guide_legend(override.aes = list(shape = 15,
-                                                  linetype = 0)),
-         shape = "none")
+        legend.position = "right") +
+  guides(shape = "none")
 
 fig_7
 
 ggsave(filename = "fig_scripts/round2/fig7.png",
        plot = fig_7,
        height = 7,
-       width = 8,
+       width = 6,
        units = "in")
+
+
+#### Try lm with SWP and VPD for phase 1 ####
+
+#### gs ####
+
+gst |> 
+  # filter(swp_0_10_mean < -1) |>
+  ggplot(aes(x = swp_0_10_mean, y = gs)) +
+  geom_point(aes(color = D_morn_mean)) +
+  scale_color_gradient(high = "coral",
+                       low = "cornflowerblue")
+gst_phase1 <- gst |> 
+  filter(swp_0_10_mean < -1)
+
+m1 <- lm(gs ~ swp_0_10_mean, data = gst_phase1)
+summary(m1)
+
+gst_phase1$resids <- resid(m1)
+
+m1_resid <- lm(resids ~ D_morn_mean, data = gst_phase1)
+summary(m1_resid)
+
+# For gs, SWP is signficant in phase 1 but not phase 2
+# In both phases VPD is NOT significant on the residuals
+
+#### ET ####
+gpp |> 
+  # filter(swp_0_10_mean < -1) |>
+  ggplot(aes(x = swp_0_10_mean, y = ET)) +
+  geom_point(aes(color = D_morn_mean)) +
+  scale_color_gradient(high = "coral",
+                       low = "cornflowerblue")
+gpp_phase1 <- gpp |> 
+  filter(swp_0_10_mean < -1)
+
+m2 <- lm(ET ~ swp_0_10_mean, data = gpp_phase1)
+summary(m2)
+
+gpp_phase1$resids <- resid(m2)
+
+m2_resid <- lm(resids ~ D_morn_mean, data = gpp_phase1)
+summary(m2_resid)
+
+# For ET, SWP is signficant in phase 1 but not phase 2
+# In both phases VPD IS significant on the residuals
+
+#### GPP ####
+
+gpp |> 
+  # filter(swp_0_10_mean < -1) |>
+  ggplot(aes(x = swp_0_10_mean, y = GPP)) +
+  geom_point(aes(color = D_morn_mean)) +
+  scale_color_gradient(high = "coral",
+                       low = "cornflowerblue")
+
+gpp |> 
+  # filter(swp_0_10_mean < -1) |>
+  ggplot(aes(x = swp_0_10_mean, y = GPP)) +
+  geom_point(aes(color = Tav)) +
+  scale_color_gradient(high = "coral",
+                       low = "cornflowerblue")
+
+# Much more of a fan shape to the data
+gpp_phase1 <- gpp |> 
+  filter(swp_0_10_mean > -1)
+
+m3 <- lm(GPP ~ swp_0_10_mean, data = gpp_phase1)
+summary(m3)
+
+gpp_phase1$resids <- resid(m3)
+
+m3_resid <- lm(resids ~ D_morn_mean, data = gpp_phase1)
+summary(m3_resid)
+
+# For GPP, SWP is marginally signficant in phase 1 and significant phase 2
+# In both phases Tav IS significant on the residuals (but VPD is not)
+
+# Try for the whole range (no dividing into phases)
+m4 <- lm(GPP ~ swp_0_10_mean, data = gpp)
+summary(m4)
+
+gpp$resids <- resid(m4)
+
+m4_resid <- lm(resids ~ Tav, data = gpp)
+summary(m4_resid)
+
+# Across the whole range of GPP, SWP is significant
+# Tav IS significant on the residuals (but VPD is not)
+
+cor(gpp$Par, gpp$D_morn_mean)
+cor(gpp$swp_0_10_mean, gpp$D_morn_mean)
+cor(gpp$Tav, gpp$Par)
+cor(gpp$Tav, gpp$D_morn_mean)
 
 # then try with treatment and VPD
 fig_7new <- all_sum |> 
