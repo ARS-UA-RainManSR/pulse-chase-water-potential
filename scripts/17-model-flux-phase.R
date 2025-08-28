@@ -312,9 +312,30 @@ ggplot(gst) +
   geom_point(aes(x = D_morn_mean, y = resids_gs,
                  color = phase))
 # Does gs vary with D across phases?
-m1 <- lm(resids_gs ~ D_morn_mean*phase, data = gst)
+m1 <- lm(resids_gs ~ D_morn_mean*phase -1, data = gst)
 summary(m1)
 # Neither by D or by phase or their interaction
+em <- emtrends(m1, "phase", var = "D_morn_mean")
+# Are the slopes of each phas different from each other?
+pairs(emtrends(m1, "phase", var = "D_morn_mean")) # No
+
+# Make an output table
+param.names <- c("Phase 1:gs", "Phase 1:VPD",
+                 "Phase 2:gs", "Phase 2:VPD")
+df <- 120
+alpha <- 0.05
+
+cell_means <- data.frame(parameter = param.names,
+                         estimate = c(coef(m1)[2], 
+                                      summary(em)$D_morn_mean.trend[1],
+                                      coef(m1)[3],
+                                      summary(em)$D_morn_mean.trend[2]),
+                         SE = c(summary(m1)$coef[2,2],
+                                summary(em)$SE[1],
+                                summary(m1)$coef[2,3],
+                                summary(em)$SE[2]))
+                         
+write_csv(cell_means, "tables/fluxes/gs_VPD_cellmeans_lm.csv")
 
 #### Explore ET variation with VPD ####
 
@@ -322,10 +343,31 @@ ggplot(gpp) +
   geom_point(aes(x = D_morn_mean, y = resids_et,
                  color = phase))
 # Does ET vary with D across phases?
-m2 <- lm(resids_et ~ D_morn_mean*phase, data = gpp)
-summary(m2)
+m1 <- lm(resids_et ~ D_morn_mean*phase -1, data = gpp)
+summary(m1)
+
 # By phase 1 and phase 2 ET respond differently to D
 # Also different intercepts
+# Neither by D or by phase or their interaction
+em <- emtrends(m1, "phase", var = "D_morn_mean")
+# Are the slopes of each phas different from each other?
+pairs(emtrends(m1, "phase", var = "D_morn_mean")) # No
+
+# Make an output table
+param.names <- c("Phase 1:ET", "Phase 1:VPD",
+                 "Phase 2:ET", "Phase 2:VPD")
+
+cell_means <- data.frame(parameter = param.names,
+                         estimate = c(coef(m1)[2], 
+                                      summary(em)$D_morn_mean.trend[1],
+                                      coef(m1)[3],
+                                      summary(em)$D_morn_mean.trend[2]),
+                         SE = c(summary(m1)$coef[2,2],
+                                summary(em)$SE[1],
+                                summary(m1)$coef[2,3],
+                                summary(em)$SE[2]))
+
+write_csv(cell_means, "tables/fluxes/ET_VPD_cellmeans_lm.csv")
 
 #### Explore GPP variation with VPD ####
 
