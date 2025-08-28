@@ -312,30 +312,72 @@ ggplot(gst) +
   geom_point(aes(x = D_morn_mean, y = resids_gs,
                  color = phase))
 # Does gs vary with D across phases?
-m1 <- lm(resids_gs ~ D_morn_mean*phase -1, data = gst)
-summary(m1)
-# Neither by D or by phase or their interaction
-em <- emtrends(m1, "phase", var = "D_morn_mean")
-# Are the slopes of each phas different from each other?
-pairs(emtrends(m1, "phase", var = "D_morn_mean")) # No
-
-# Make an output table
-param.names <- c("Phase 1:gs", "Phase 1:VPD",
-                 "Phase 2:gs", "Phase 2:VPD")
-df <- 120
+gs.vpd.phase <- lme4::lmer(resids_gs ~ phase + D_morn_mean*phase + (1|ID), data = gst)
+summary(gs.vpd.phase)
+vcovadj <- pbkrtest::vcovAdj(gs.swp.phase)
 alpha <- 0.05
+digits <- 3
+pval.digits <- 3
+p.val.ub <- 0.001
 
-cell_means <- data.frame(parameter = param.names,
-                         estimate = c(coef(m1)[2], 
-                                      summary(em)$D_morn_mean.trend[1],
-                                      coef(m1)[3],
-                                      summary(em)$D_morn_mean.trend[2]),
-                         SE = c(summary(m1)$coef[2,2],
-                                summary(em)$SE[1],
-                                summary(m1)$coef[2,3],
-                                summary(em)$SE[2]))
-                         
-write_csv(cell_means, "tables/fluxes/gs_VPD_cellmeans_lm.csv")
+model.fixed.effects <- lme4::fixef(gs.vpd.phase)
+fixed.effects.contrasts <- diag(length(model.fixed.effects))
+model.fixef.results <- data.frame(parameter = as.character(rep(NA, length(model.fixed.effects))),
+                                  estimate = as.numeric(rep(NA, length(model.fixed.effects))),
+                                  ci = as.character(rep(NA, length(model.fixed.effects))),
+                                  den.df = as.numeric(rep(NA, length(model.fixed.effects))),
+                                  tstat = as.numeric(rep(NA, length(model.fixed.effects))),
+                                  pval = as.character(rep(NA, length(model.fixed.effects))))
+
+for (r in 1:length(model.fixed.effects)) {
+  contrast.mat <- matrix(fixed.effects.contrasts[r, ], nrow = 1)
+  df <- get_Lb_ddf(gs.vpd.phase, contrast.mat)
+  pt.est <- fixef(gs.vpd.phase) %*% t(contrast.mat)
+  vcov.est <- contrast.mat %*% vcovadj %*% t(contrast.mat)
+  sd.est <- sqrt(vcov.est)
+  t.stat <- sqrt(as.numeric(pt.est %*% solve(vcov.est) %*% t(pt.est)))
+  t.stat <- ifelse(pt.est < 0, -1*t.stat, t.stat)
+  p.val <- 2*pt(abs(t.stat), df, lower.tail = F)
+  model.fixef.results[r, c("parameter", "ci", "pval")] <- c(names(model.fixed.effects)[r],
+                                                            paste0("(", round(pt.est - sd.est*qt(1 - alpha/2, df, lower.tail = T), digits),
+                                                                   ", ", round(pt.est + sd.est*qt(1 - alpha/2, df, lower.tail = T), digits), ")"),
+                                                            ifelse(round(p.val, pval.digits) == 0, p.val.ub, round(p.val, pval.digits)))
+  model.fixef.results[r, c("estimate", "den.df", "tstat")] <- round(c(pt.est, df, t.stat), digits)
+}
+
+write_csv(model.fixef.results, "tables/fluxes/gsresid_VPD_phase_KR.csv")
+
+# Test non-additive version: two slopes and two intercepts
+param.names <- c("Phase 1:gs_resids", "Phase 1:VPD",
+                 "Phase 2:gs_resids", "Phase 2:VPD")
+fixed.effects.contrasts2 <- matrix(c(1,0,0,0,
+                                     0,0,1,0,
+                                     1,1,0,0,
+                                     0,0,1,1), ncol = 4, byrow = TRUE)
+model.fixef.results2 <- data.frame(parameter = as.character(rep(NA, nrow(fixed.effects.contrasts2))),
+                                   estimate = as.numeric(rep(NA, nrow(fixed.effects.contrasts2))),
+                                   ci = as.character(rep(NA, nrow(fixed.effects.contrasts2))),
+                                   den.df = as.numeric(rep(NA, nrow(fixed.effects.contrasts2))),
+                                   tstat = as.numeric(rep(NA, nrow(fixed.effects.contrasts2))),
+                                   pval = as.character(rep(NA, nrow(fixed.effects.contrasts2))))
+for(r in 1:nrow(fixed.effects.contrasts2)) {
+  contrast.mat <- matrix(fixed.effects.contrasts2[r, ], nrow = 1)
+  df <- pbkrtest::get_Lb_ddf(gs.vpd.phase, contrast.mat)
+  pt.est <- lme4::fixef(gs.vpd.phase) %*% t(contrast.mat)
+  vcov.est <- contrast.mat %*% vcovadj %*% t(contrast.mat)
+  sd.est <- sqrt(vcov.est)
+  t.stat <- sqrt(as.numeric(pt.est %*% solve(vcov.est) %*% t(pt.est)))
+  t.stat <- ifelse(pt.est < 0, -1*t.stat, t.stat)
+  p.val <- 2*pt(abs(t.stat), df, lower.tail = F)
+  model.fixef.results2[r, c("parameter", "ci", "pval")] <- c(param.names[r],
+                                                             paste0("(", round(pt.est - sd.est*qt(1 - alpha/2, df, lower.tail = T), digits),
+                                                                    ", ", round(pt.est + sd.est*qt(1 - alpha/2, df, lower.tail = T), digits), ")"),
+                                                             ifelse(round(p.val, pval.digits) == 0, p.val.ub, round(p.val, pval.digits)))
+  model.fixef.results2[r, c("estimate", "den.df", "tstat")] <- round(c(pt.est, df, t.stat), digits)
+}
+write_csv(model.fixef.results2, "tables/fluxes/gsresid_VPD_cellmeans_KR.csv")
+
+# Answer: No, slopes are not different from zero or by phase
 
 #### Explore ET variation with VPD ####
 
@@ -343,50 +385,217 @@ ggplot(gpp) +
   geom_point(aes(x = D_morn_mean, y = resids_et,
                  color = phase))
 # Does ET vary with D across phases?
-m1 <- lm(resids_et ~ D_morn_mean*phase -1, data = gpp)
-summary(m1)
+et.vpd.phase <- lme4::lmer(resids_et ~ phase + D_morn_mean*phase + (1|ID), data = gpp)
+summary(et.vpd.phase)
+vcovadj <- pbkrtest::vcovAdj(et.vpd.phase)
+alpha <- 0.05
+digits <- 3
+pval.digits <- 3
+p.val.ub <- 0.001
 
-# By phase 1 and phase 2 ET respond differently to D
-# Also different intercepts
-# Neither by D or by phase or their interaction
-em <- emtrends(m1, "phase", var = "D_morn_mean")
-# Are the slopes of each phas different from each other?
-pairs(emtrends(m1, "phase", var = "D_morn_mean")) # No
+model.fixed.effects <- lme4::fixef(et.vpd.phase)
+fixed.effects.contrasts <- diag(length(model.fixed.effects))
+model.fixef.results <- data.frame(parameter = as.character(rep(NA, length(model.fixed.effects))),
+                                  estimate = as.numeric(rep(NA, length(model.fixed.effects))),
+                                  ci = as.character(rep(NA, length(model.fixed.effects))),
+                                  den.df = as.numeric(rep(NA, length(model.fixed.effects))),
+                                  tstat = as.numeric(rep(NA, length(model.fixed.effects))),
+                                  pval = as.character(rep(NA, length(model.fixed.effects))))
 
-# Make an output table
-param.names <- c("Phase 1:ET", "Phase 1:VPD",
-                 "Phase 2:ET", "Phase 2:VPD")
+for (r in 1:length(model.fixed.effects)) {
+  contrast.mat <- matrix(fixed.effects.contrasts[r, ], nrow = 1)
+  df <- get_Lb_ddf(et.vpd.phase, contrast.mat)
+  pt.est <- fixef(et.vpd.phase) %*% t(contrast.mat)
+  vcov.est <- contrast.mat %*% vcovadj %*% t(contrast.mat)
+  sd.est <- sqrt(vcov.est)
+  t.stat <- sqrt(as.numeric(pt.est %*% solve(vcov.est) %*% t(pt.est)))
+  t.stat <- ifelse(pt.est < 0, -1*t.stat, t.stat)
+  p.val <- 2*pt(abs(t.stat), df, lower.tail = F)
+  model.fixef.results[r, c("parameter", "ci", "pval")] <- c(names(model.fixed.effects)[r],
+                                                            paste0("(", round(pt.est - sd.est*qt(1 - alpha/2, df, lower.tail = T), digits),
+                                                                   ", ", round(pt.est + sd.est*qt(1 - alpha/2, df, lower.tail = T), digits), ")"),
+                                                            ifelse(round(p.val, pval.digits) == 0, p.val.ub, round(p.val, pval.digits)))
+  model.fixef.results[r, c("estimate", "den.df", "tstat")] <- round(c(pt.est, df, t.stat), digits)
+}
 
-cell_means <- data.frame(parameter = param.names,
-                         estimate = c(coef(m1)[2], 
-                                      summary(em)$D_morn_mean.trend[1],
-                                      coef(m1)[3],
-                                      summary(em)$D_morn_mean.trend[2]),
-                         SE = c(summary(m1)$coef[2,2],
-                                summary(em)$SE[1],
-                                summary(m1)$coef[2,3],
-                                summary(em)$SE[2]))
+write_csv(model.fixef.results, "tables/fluxes/etresid_VPD_phase_KR.csv")
 
-write_csv(cell_means, "tables/fluxes/ET_VPD_cellmeans_lm.csv")
+# Test non-additive version: two slopes and two intercepts
+param.names <- c("Phase 1:et_resids", "Phase 1:VPD",
+                 "Phase 2:et_resids", "Phase 2:VPD")
+fixed.effects.contrasts2 <- matrix(c(1,0,0,0,
+                                     0,0,1,0,
+                                     1,1,0,0,
+                                     0,0,1,1), ncol = 4, byrow = TRUE)
+model.fixef.results2 <- data.frame(parameter = as.character(rep(NA, nrow(fixed.effects.contrasts2))),
+                                   estimate = as.numeric(rep(NA, nrow(fixed.effects.contrasts2))),
+                                   ci = as.character(rep(NA, nrow(fixed.effects.contrasts2))),
+                                   den.df = as.numeric(rep(NA, nrow(fixed.effects.contrasts2))),
+                                   tstat = as.numeric(rep(NA, nrow(fixed.effects.contrasts2))),
+                                   pval = as.character(rep(NA, nrow(fixed.effects.contrasts2))))
+for(r in 1:nrow(fixed.effects.contrasts2)) {
+  contrast.mat <- matrix(fixed.effects.contrasts2[r, ], nrow = 1)
+  df <- pbkrtest::get_Lb_ddf(et.vpd.phase, contrast.mat)
+  pt.est <- lme4::fixef(et.vpd.phase) %*% t(contrast.mat)
+  vcov.est <- contrast.mat %*% vcovadj %*% t(contrast.mat)
+  sd.est <- sqrt(vcov.est)
+  t.stat <- sqrt(as.numeric(pt.est %*% solve(vcov.est) %*% t(pt.est)))
+  t.stat <- ifelse(pt.est < 0, -1*t.stat, t.stat)
+  p.val <- 2*pt(abs(t.stat), df, lower.tail = F)
+  model.fixef.results2[r, c("parameter", "ci", "pval")] <- c(param.names[r],
+                                                             paste0("(", round(pt.est - sd.est*qt(1 - alpha/2, df, lower.tail = T), digits),
+                                                                    ", ", round(pt.est + sd.est*qt(1 - alpha/2, df, lower.tail = T), digits), ")"),
+                                                             ifelse(round(p.val, pval.digits) == 0, p.val.ub, round(p.val, pval.digits)))
+  model.fixef.results2[r, c("estimate", "den.df", "tstat")] <- round(c(pt.est, df, t.stat), digits)
+}
+write_csv(model.fixef.results2, "tables/fluxes/etresid_VPD_cellmeans_KR.csv")
+
+# Answer: Yes, slopes with VPD are both non-zero and different from each other
 
 #### Explore GPP variation with VPD ####
 
 ggplot(gpp) +
   geom_point(aes(x = D_morn_mean, y = resids_gpp,
                  color = phase))
+
 # Does GPP vary with D across phases?
-m3 <- lm(resids_gpp ~ D_morn_mean*phase, data = gpp)
-summary(m3)
-# Nothing significant
+gpp.vpd.phase <- lme4::lmer(resids_gpp ~ phase + D_morn_mean*phase + (1|ID), data = gpp)
+summary(gpp.vpd.phase)
+vcovadj <- pbkrtest::vcovAdj(gpp.vpd.phase)
+alpha <- 0.05
+digits <- 3
+pval.digits <- 3
+p.val.ub <- 0.001
+
+model.fixed.effects <- lme4::fixef(gpp.vpd.phase)
+fixed.effects.contrasts <- diag(length(model.fixed.effects))
+model.fixef.results <- data.frame(parameter = as.character(rep(NA, length(model.fixed.effects))),
+                                  estimate = as.numeric(rep(NA, length(model.fixed.effects))),
+                                  ci = as.character(rep(NA, length(model.fixed.effects))),
+                                  den.df = as.numeric(rep(NA, length(model.fixed.effects))),
+                                  tstat = as.numeric(rep(NA, length(model.fixed.effects))),
+                                  pval = as.character(rep(NA, length(model.fixed.effects))))
+
+for (r in 1:length(model.fixed.effects)) {
+  contrast.mat <- matrix(fixed.effects.contrasts[r, ], nrow = 1)
+  df <- get_Lb_ddf(gpp.vpd.phase, contrast.mat)
+  pt.est <- fixef(gpp.vpd.phase) %*% t(contrast.mat)
+  vcov.est <- contrast.mat %*% vcovadj %*% t(contrast.mat)
+  sd.est <- sqrt(vcov.est)
+  t.stat <- sqrt(as.numeric(pt.est %*% solve(vcov.est) %*% t(pt.est)))
+  t.stat <- ifelse(pt.est < 0, -1*t.stat, t.stat)
+  p.val <- 2*pt(abs(t.stat), df, lower.tail = F)
+  model.fixef.results[r, c("parameter", "ci", "pval")] <- c(names(model.fixed.effects)[r],
+                                                            paste0("(", round(pt.est - sd.est*qt(1 - alpha/2, df, lower.tail = T), digits),
+                                                                   ", ", round(pt.est + sd.est*qt(1 - alpha/2, df, lower.tail = T), digits), ")"),
+                                                            ifelse(round(p.val, pval.digits) == 0, p.val.ub, round(p.val, pval.digits)))
+  model.fixef.results[r, c("estimate", "den.df", "tstat")] <- round(c(pt.est, df, t.stat), digits)
+}
+
+write_csv(model.fixef.results, "tables/fluxes/gppresid_VPD_phase_KR.csv")
+
+# Test non-additive version: two slopes and two intercepts
+param.names <- c("Phase 1:gpp_resids", "Phase 1:VPD",
+                 "Phase 2:gpp_resids", "Phase 2:VPD")
+fixed.effects.contrasts2 <- matrix(c(1,0,0,0,
+                                     0,0,1,0,
+                                     1,1,0,0,
+                                     0,0,1,1), ncol = 4, byrow = TRUE)
+model.fixef.results2 <- data.frame(parameter = as.character(rep(NA, nrow(fixed.effects.contrasts2))),
+                                   estimate = as.numeric(rep(NA, nrow(fixed.effects.contrasts2))),
+                                   ci = as.character(rep(NA, nrow(fixed.effects.contrasts2))),
+                                   den.df = as.numeric(rep(NA, nrow(fixed.effects.contrasts2))),
+                                   tstat = as.numeric(rep(NA, nrow(fixed.effects.contrasts2))),
+                                   pval = as.character(rep(NA, nrow(fixed.effects.contrasts2))))
+for(r in 1:nrow(fixed.effects.contrasts2)) {
+  contrast.mat <- matrix(fixed.effects.contrasts2[r, ], nrow = 1)
+  df <- pbkrtest::get_Lb_ddf(gpp.vpd.phase, contrast.mat)
+  pt.est <- lme4::fixef(gpp.vpd.phase) %*% t(contrast.mat)
+  vcov.est <- contrast.mat %*% vcovadj %*% t(contrast.mat)
+  sd.est <- sqrt(vcov.est)
+  t.stat <- sqrt(as.numeric(pt.est %*% solve(vcov.est) %*% t(pt.est)))
+  t.stat <- ifelse(pt.est < 0, -1*t.stat, t.stat)
+  p.val <- 2*pt(abs(t.stat), df, lower.tail = F)
+  model.fixef.results2[r, c("parameter", "ci", "pval")] <- c(param.names[r],
+                                                             paste0("(", round(pt.est - sd.est*qt(1 - alpha/2, df, lower.tail = T), digits),
+                                                                    ", ", round(pt.est + sd.est*qt(1 - alpha/2, df, lower.tail = T), digits), ")"),
+                                                             ifelse(round(p.val, pval.digits) == 0, p.val.ub, round(p.val, pval.digits)))
+  model.fixef.results2[r, c("estimate", "den.df", "tstat")] <- round(c(pt.est, df, t.stat), digits)
+}
+write_csv(model.fixef.results2, "tables/fluxes/gppresid_VPD_cellmeans_KR.csv")
+
+# Answer: No, slopes with VPD are non-significant and not different from each other
 
 #### Explore GPP variation with PAR ####
 
 ggplot(gpp) +
   geom_point(aes(x = Par, y = resids_gpp,
                  color = phase))
-# Does GPP vary with D across phases?
-m4 <- lm(resids_gpp ~ Par*phase, data = gpp)
-summary(m4)
-# Nothing significant
 
+# Does GPP vary with PAR across phases?
+gpp.par.phase <- lme4::lmer(resids_gpp ~ phase + Par*phase + (1|ID), data = gpp)
+summary(gpp.par.phase)
+vcovadj <- pbkrtest::vcovAdj(gpp.par.phase)
+alpha <- 0.05
+digits <- 3
+pval.digits <- 3
+p.val.ub <- 0.001
 
+model.fixed.effects <- lme4::fixef(gpp.par.phase)
+fixed.effects.contrasts <- diag(length(model.fixed.effects))
+model.fixef.results <- data.frame(parameter = as.character(rep(NA, length(model.fixed.effects))),
+                                  estimate = as.numeric(rep(NA, length(model.fixed.effects))),
+                                  ci = as.character(rep(NA, length(model.fixed.effects))),
+                                  den.df = as.numeric(rep(NA, length(model.fixed.effects))),
+                                  tstat = as.numeric(rep(NA, length(model.fixed.effects))),
+                                  pval = as.character(rep(NA, length(model.fixed.effects))))
+
+for (r in 1:length(model.fixed.effects)) {
+  contrast.mat <- matrix(fixed.effects.contrasts[r, ], nrow = 1)
+  df <- get_Lb_ddf(gpp.par.phase, contrast.mat)
+  pt.est <- fixef(gpp.par.phase) %*% t(contrast.mat)
+  vcov.est <- contrast.mat %*% vcovadj %*% t(contrast.mat)
+  sd.est <- sqrt(vcov.est)
+  t.stat <- sqrt(as.numeric(pt.est %*% solve(vcov.est) %*% t(pt.est)))
+  t.stat <- ifelse(pt.est < 0, -1*t.stat, t.stat)
+  p.val <- 2*pt(abs(t.stat), df, lower.tail = F)
+  model.fixef.results[r, c("parameter", "ci", "pval")] <- c(names(model.fixed.effects)[r],
+                                                            paste0("(", round(pt.est - sd.est*qt(1 - alpha/2, df, lower.tail = T), digits),
+                                                                   ", ", round(pt.est + sd.est*qt(1 - alpha/2, df, lower.tail = T), digits), ")"),
+                                                            ifelse(round(p.val, pval.digits) == 0, p.val.ub, round(p.val, pval.digits)))
+  model.fixef.results[r, c("estimate", "den.df", "tstat")] <- round(c(pt.est, df, t.stat), digits)
+}
+
+write_csv(model.fixef.results, "tables/fluxes/gppresid_PAR_phase_KR.csv")
+
+# Test non-additive version: two slopes and two intercepts
+param.names <- c("Phase 1:gpp_resids", "Phase 1:PAR",
+                 "Phase 2:gpp_resids", "Phase 2:PAR")
+fixed.effects.contrasts2 <- matrix(c(1,0,0,0,
+                                     0,0,1,0,
+                                     1,1,0,0,
+                                     0,0,1,1), ncol = 4, byrow = TRUE)
+model.fixef.results2 <- data.frame(parameter = as.character(rep(NA, nrow(fixed.effects.contrasts2))),
+                                   estimate = as.numeric(rep(NA, nrow(fixed.effects.contrasts2))),
+                                   ci = as.character(rep(NA, nrow(fixed.effects.contrasts2))),
+                                   den.df = as.numeric(rep(NA, nrow(fixed.effects.contrasts2))),
+                                   tstat = as.numeric(rep(NA, nrow(fixed.effects.contrasts2))),
+                                   pval = as.character(rep(NA, nrow(fixed.effects.contrasts2))))
+for(r in 1:nrow(fixed.effects.contrasts2)) {
+  contrast.mat <- matrix(fixed.effects.contrasts2[r, ], nrow = 1)
+  df <- pbkrtest::get_Lb_ddf(gpp.par.phase, contrast.mat)
+  pt.est <- lme4::fixef(gpp.par.phase) %*% t(contrast.mat)
+  vcov.est <- contrast.mat %*% vcovadj %*% t(contrast.mat)
+  sd.est <- sqrt(vcov.est)
+  t.stat <- sqrt(as.numeric(pt.est %*% solve(vcov.est) %*% t(pt.est)))
+  t.stat <- ifelse(pt.est < 0, -1*t.stat, t.stat)
+  p.val <- 2*pt(abs(t.stat), df, lower.tail = F)
+  model.fixef.results2[r, c("parameter", "ci", "pval")] <- c(param.names[r],
+                                                             paste0("(", round(pt.est - sd.est*qt(1 - alpha/2, df, lower.tail = T), digits),
+                                                                    ", ", round(pt.est + sd.est*qt(1 - alpha/2, df, lower.tail = T), digits), ")"),
+                                                             ifelse(round(p.val, pval.digits) == 0, p.val.ub, round(p.val, pval.digits)))
+  model.fixef.results2[r, c("estimate", "den.df", "tstat")] <- round(c(pt.est, df, t.stat), digits)
+}
+write_csv(model.fixef.results2, "tables/fluxes/gppresid_PAR_cellmeans_KR.csv")
+
+# Answer: No, slopes with PAR are non-significant and not different from each other
