@@ -107,7 +107,7 @@ fig7 <-
         legend.position.inside = c(0.1, 0.5))
 
 
-ggsave(filename = "fig_scripts/fig8.png",
+ggsave(filename = "fig_scripts/round2/fig8.png",
        plot = fig7,
        height = 4,
        width = 8,
