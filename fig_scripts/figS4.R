@@ -1,72 +1,125 @@
-# Fig S4
-# Model fit for double changepoint model
+# Supplemental figure comparing RWC and RWCind
 
-library(coda)
-library(broom.mixed)
+# Comparison of RWC with multiple hyperspec water indices
+# Use all treatments but subdivide in to Phase 1 and Phase 2
+
 library(tidyverse)
-library(RColorBrewer)
+library(ggh4x)
 library(cowplot)
+library(RColorBrewer)
 
-#### A) Predicted vs Observed with WP4 samples ####
+# Read in long data with indices
+all <- read_csv("data_clean/spectra_ind_wp_rwc.csv") |> 
+  mutate(period2 = case_when(period == "predawn" ~ "PD",
+                             period == "midday" ~ "MD") |> 
+           factor(levels = c("PD", "MD")),
+         trt_label = case_when(trt_s == "S1" ~ "P3.5",
+                               trt_s == "S2" ~ "P7",
+                               trt_s == "S4" ~ "P21") |>
+           factor(levels = c("P3.5", "P7", "P21")))
 
-# Load posterior predicted values
-load("scripts/mod4 - piecewise/coda/coda_pred_mod1.Rdata")
-
-sum_pred <- broom.mixed::tidyMCMC(coda_pred, 
-                                  conf.int = TRUE, 
-                                  conf.method = "HPDinterval") |> 
-  rename(pred.upper = conf.high, 
-         pred.lower = conf.low, 
-         pred.mean = estimate)
-
-# Read in original data and add values
-load("scripts/mod4 - piecewise/s4_all.Rdata") # dat2
-
-S4_pd <- dat2 |> 
-  filter(variable == "WP",
-         period == "predawn") |> 
-  bind_cols(sum_pred[, c(2, 4:5)]) |> 
-  mutate(plot = factor(ID),
-         coverage = ifelse(value <= pred.upper & value >= pred.lower, 1, 0))
-
-m1 <- lm(pred.mean ~ value, data = S4_pd)
-summary(m1) # R2 = 0.9272
-coefs <- coef(summary(m1))
-coefs[2,1] # Bias of 0.897
-mean(S4_pd$coverage) # Coverage of 0.981
+# quick plot
+all |> 
+  ggplot(aes(x = RWC_ind, y = RWC)) +
+  geom_point(aes(color = period)) +
+  scale_x_reverse() +
+  facet_wrap(~trt_label)
 
 
-figS4 <- S4_pd |> 
-  ggplot() +
-  geom_abline(slope = 1, intercept = 0) +
-  geom_abline(slope = coefs[2,1], intercept = coefs[1,1],
-              linetype = "dashed") +
-  geom_errorbar(aes(x = value,
-                    ymin = pred.lower,
-                    ymax = pred.upper),
-                width = 0,
-                alpha = 0.25) +
-  geom_point(aes(x = value, 
-                 y = pred.mean)) +
-  geom_text(x = -1, y = -4.5, 
-            label = "italic(R^2)==0.927",
+# Check if period is significant
+summary(lm(RWC ~ RWC_ind*period, data = filter(all, trt_label == "P3.5")))
+summary(lm(RWC ~ RWC_ind*period, data = filter(all, trt_label == "P7")))
+summary(lm(RWC ~ RWC_ind, data = filter(all, trt_label == "P7")))
+
+filter(all, trt_label == "P7") |> 
+  ggplot(aes(x = RWC_ind, y = RWC)) +
+  geom_point(aes(color = period)) +
+  geom_abline(slope = -2.91, intercept = 2.70, color = "red") +
+  geom_abline(slope = -2.91+1.374, intercept = 2.70-0.845, color = "blue") +
+  geom_abline(slope = -2.417, intercept = 2.41, color = "black")
+
+summary(lm(RWC ~ RWC_ind*period, data = filter(all, trt_label == "P21")))
+
+# Repeated lms for each treatment (no need to account fo period)
+
+lm_params<- all |>
+  nest_by(trt_label) |>
+  mutate(model = list(lm(RWC ~ RWC_ind, data = data))) |>
+  summarize(broom::glance(model),
+            slope = coef(summary(model))[2,1],
+            intercept = coef(summary(model))[1,1]) |>
+  mutate(sig = if_else(p.value < 0.05, TRUE, FALSE),
+         sig2  = if_else(p.value < 0.001, TRUE, FALSE))
+
+
+# Position text to report p value and R2
+lm_text <- all |>
+  group_by(trt_label) |>
+  summarize(x = max(RWC_ind),
+            y = 1) |>
+  ungroup() |> 
+  mutate(x = max(x)) |> 
+  left_join(select(lm_params, 
+                   trt_label, adj.r.squared, p.value, sig2)) |>
+  mutate(lab1 = if_else(sig2 == TRUE,
+                        paste0("p < 0.001"),
+                        paste0("p==", round(p.value, 2))),
+         lab2 = if_else(sig2 == TRUE,  
+                        paste0("R^2==", round(adj.r.squared, 2)),
+                        ""))
+         # x = case_when(index_name2 == "RWC[ind]" ~ x-0.035,
+         #               index_name2 == "WBI" ~ x - 0.005,
+         #               .default = x))
+lm_text
+
+# colors for figure
+cols_gn <- brewer.pal(4, "Paired")
+cols_div <- brewer.pal(7, "Spectral")
+strip <- strip_themed(background_y = elem_list_rect(fill = cols_div[c(6,3)]))
+
+#### Figure for supplement ####
+figs4 <-
+  all |> 
+  mutate(period = factor(period, levels = c("predawn", "midday"))) |> 
+  ggplot(aes(x = RWC_ind, y = RWC)) +
+  geom_point(aes(color = period)) +
+  geom_abline(data = lm_params,
+              aes(slope = slope,
+                  intercept = intercept,
+                  linetype = sig)) +
+  geom_text(data = lm_text,
+            aes(x = x, y = y,
+                label = lab1),
             parse = TRUE,
-            hjust = 0.5,
             vjust = 1,
+            hjust = 0,
             size = 4) +
-  scale_x_continuous(expression(paste("Observed ", Psi[PD], " (MPa)")),
-                     limits = c(-5, 0.405)) +
-  scale_y_continuous(expression(paste("Predicted ", Psi[PD], " (MPa)")),
-                     limits = c(-5, 0.405)) +
+  geom_text(data = lm_text,
+            aes(x = x, y = y-0.05,
+                label = lab2),
+            parse = TRUE,
+            vjust = 1,
+            hjust = 0,
+            size = 4) +
+  facet_wrap(~trt_label) +
+  scale_x_reverse(expression(paste(RWC[ind]))) +
+  scale_color_manual(values = cols_gn[4:3]) +
+  scale_linetype_manual(values = c("solid")) +
   theme_bw(base_size = 14) +
-  coord_equal() +
   theme(panel.grid = element_blank(),
         legend.title = element_blank(),
-        legend.position = c(0.2, 0.9),
-        legend.background = element_blank())
+        legend.position = "inside",
+        legend.position.inside = c(0.23, 0.1),
+        legend.text = element_text(size = 12),
+        legend.background = element_rect(fill = NA),
+        strip.placement = "outside",
+        strip.background.x = element_blank()) +
+  guides(linetype = "none",
+         color = guide_legend(keyheight = 0.03,
+                              default.unit = "cm"))
 
-ggsave("fig_scripts/round2/figS4.png",
-       figS4,
-       height = 4,
-       width = 4,
+ggsave(filename = "fig_scripts/round2/figS4.png",
+       plot = figs4,
+       height = 3.5,
+       width = 8,
        units = "in")
