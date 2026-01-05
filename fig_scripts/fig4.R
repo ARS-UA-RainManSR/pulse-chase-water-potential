@@ -107,6 +107,12 @@ floor(cp2);ceiling(cp2)
 swp_sub <- swp |> 
   filter(days_since_pulse %in% 10:13)
 m_swp <- lm(SWP_1 ~ days_since_pulse, data = swp_sub)
+to_pred <- cps |> 
+  filter(term == "mu.cp[2]") |> 
+  select(-term, -std.error) |> 
+  pivot_longer(1:3) |> 
+  rename(days_since_pulse = value) |> 
+  select(-name)
 swp_pred <- cps |> 
   filter(term == "mu.cp[2]") |> 
   select(-term, -std.error) |> 
