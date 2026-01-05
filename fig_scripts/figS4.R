@@ -28,8 +28,8 @@ all |>
 
 # Check if period is significant
 summary(lm(RWC ~ RWC_ind*period, data = filter(all, trt_label == "P3.5")))
-summary(lm(RWC ~ RWC_ind*period, data = filter(all, trt_label == "P7")))
 summary(lm(RWC ~ RWC_ind, data = filter(all, trt_label == "P7")))
+summary(lm(RWC ~ RWC_ind*period, data = filter(all, trt_label == "P21")))
 
 filter(all, trt_label == "P7") |> 
   ggplot(aes(x = RWC_ind, y = RWC)) +
@@ -84,7 +84,7 @@ figs4 <-
   ggplot(aes(x = RWC_ind, y = RWC)) +
   geom_point(aes(color = period)) +
   geom_abline(data = lm_params,
-              aes(slope = slope,
+              aes(slope = -slope,
                   intercept = intercept,
                   linetype = sig)) +
   geom_text(data = lm_text,
