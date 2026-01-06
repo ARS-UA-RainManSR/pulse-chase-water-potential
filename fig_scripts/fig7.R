@@ -254,7 +254,7 @@ figb
 
 row1 <- cowplot::plot_grid(figa, figb, nrow = 1,
                            rel_widths = c(2.25, 1),
-                           labels = c("a", "b"))
+                           labels = c("a", "d"))
 row1
 
 
@@ -363,7 +363,7 @@ figd <- ggplot() +
 
 row2 <- cowplot::plot_grid(figc, figd, nrow = 1,
                            rel_widths = c(2.25, 1),
-                           labels = c("c", "d"))
+                           labels = c("b", "e"))
 row2
 
 #### GPP ####
@@ -471,7 +471,7 @@ figf <- ggplot() +
 
 row3 <- cowplot::plot_grid(fige, figf, nrow = 1,
                            rel_widths = c(2.25, 1),
-                           labels = c("e", "f"))
+                           labels = c("c", "f"))
 row3
 
 
@@ -484,7 +484,7 @@ fig_7 <- cowplot::plot_grid(figa, figb,
                             nrow = 3,
                             align = "hv", axis = "lb",
                             rel_widths = c(2.25, 1),
-                            labels = "auto")
+                            labels = c("a", "d", "b", "e", "c", "f"))
 fig_7
 
 ggsave(filename = "fig_scripts/round2/fig7.png",
@@ -529,8 +529,20 @@ figg <- ggplot() +
   scale_linetype_manual(values = "longdash") +
   scale_color_manual(values = cols_div[c(6,3)]) +
   theme_bw(base_size = 10) +
-  theme(panel.grid = element_blank()) +
-  guides(color = "none", lty = "none")
+  theme(panel.grid = element_blank(),
+        legend.title = element_blank(),
+        legend.background = element_blank(),
+        # legend.spacing.y = unit(0.05, "cm"),
+        legend.margin = margin(t = 0.025, unit = "cm"),
+        # legend.position.inside = c(0.5, 0.9),
+        legend.position = "top"
+  ) +
+  guides(lty = "none",
+         color = guide_legend(override.aes = list(linetype = c(0, 0)),
+                              byrow = TRUE,
+                              keywidth = 0.1,
+                              keyheight = 0.01,
+                              default.unit = "cm"))
 
 
 ggsave(filename = "fig_scripts/round2/figS_.png",
