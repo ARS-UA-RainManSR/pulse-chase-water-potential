@@ -62,6 +62,9 @@ vwc <- read_csv("data_clean/vwc_daily_daytime.csv") |>
          VWC_1 = mean) |> 
   dplyr::select(-period, -sd, -depth)
 
+# Psi_soil threshold from fig4.R script
+Psi_soil <- -0.917
+
 # Combine data and classify into phases
 wp_all <- wp |> 
   left_join(swp, by = join_by(date_col == date,
@@ -70,8 +73,8 @@ wp_all <- wp |>
                               period)) |>
   left_join(vwc, by = join_by(date_col == date,
                               trt_s)) |>
-  mutate(phase = case_when(SWP_1 >= -1 ~ "Phase 1",
-                           SWP_1 < -1 ~ "Phase 2"),
+  mutate(phase = case_when(SWP_1 >= Psi_soil ~ "Phase 1",
+                           SWP_1 < Psi_soil ~ "Phase 2"),
          period2 = case_when(period == "predawn" ~ "PD",
                              period == "midday" ~ "MD") |> 
            factor(levels = c("PD", "MD")),
@@ -146,7 +149,7 @@ for(r in 1:length(model.fixed.effects2)) {
 param.names <- c("Phase 1:PD", "Phase 1:MD", "Phase 1:SWP",
                  "Phase 2:PD", "Phase 2:MD", "Phase 2:SWP")
 fixed.effects.contrasts2b <- matrix(c(1,0,0,0,0,
-                                      0,1,0,0,0,
+                                      1,1,0,0,0,
                                       0,0,1,0,0,
                                       1,0,0,1,0,
                                       1,1,0,1,0,
@@ -174,7 +177,7 @@ for(r in 1:nrow(fixed.effects.contrasts2b)) {
 }
 write_csv(model.fixef.results2b, "tables/SWP_cellmeans_KR.csv")
 
-# Switch to plotable params
+# Switch to plottable params
 model.fixef.results2b <- read_csv("tables/SWP_cellmeans_KR.csv")
 
 params2 <- model.fixef.results2b |>
@@ -238,7 +241,7 @@ for(r in 1:length(model.fixed.effects3)) {
 param.names <- c("Phase 1:PD", "Phase 1:MD", "Phase 1:PD:VPD", "Phase 1:MD:VPD",
                  "Phase 2:PD", "Phase 2:MD", "Phase 2:PD:VPD", "Phase 2:MD:VPD")
 fixed.effects.contrasts3b <- matrix(c(1,0,0,0,0,0,0,
-                                      0,1,0,0,0,0,0,
+                                      1,1,0,0,0,0,0,
                                       0,0,1,0,0,0,0,
                                       0,0,1,0,1,0,0,
                                       1,0,0,1,0,0,0,
@@ -304,7 +307,8 @@ fig5a <-
   geom_abline(data = params2,
               aes(slope = -slope, intercept = intercept,
                   color = Time,
-                  lty = sig)) +
+                  lty = sig),
+              linewidth = 0.75) +
   # geom_text(data = lab1,
   #           aes(x = -1, y = -5.5, label = label),
   #           parse = TRUE,
@@ -319,7 +323,7 @@ fig5a <-
   theme(panel.grid = element_blank(),
         legend.title = element_blank(),
         legend.position = "inside",
-        legend.position.inside = c(0.1, 0.2),
+        legend.position.inside = c(0.4, 0.2),
         legend.background = element_blank()) +
   guides(color = guide_legend(override.aes = list(linetype = c(0, 0))),
          linetype = "none")
@@ -331,7 +335,8 @@ fig5b <-
   geom_abline(data = params3,
               aes(slope = slope, intercept = intercept,
                   color = Time,
-                  lty = sig)) +
+                  lty = sig),
+              linewidth = 0.75) +
   # geom_text(data = lab1,
   #           aes(x = -1, y = -5.5, label = label),
   #           parse = TRUE,
