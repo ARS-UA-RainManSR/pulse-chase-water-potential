@@ -17,7 +17,7 @@ swp <- read_csv("data_clean/swp_daily_daytime.csv") |>
   filter(period == "morn",
          date >= min(wp$date_col),
          date <= max(wp$date_col),
-         depth == "0-12 cm",
+         depth == "0-10 cm",
          summer != "S3") |> 
   rename(trt_s = summer,
          SWP_1 = mean) |> 
@@ -32,23 +32,35 @@ vpd <- read_csv("data_clean/vpd_daily_daytime.csv") |>
                             period == "MD" ~ "midday")) |> 
   rename(Dmean = mean)
 
+# Psi_soil threshold from fig4.R script
+Psi_soil <- -0.917
+
 # Combine data and classify into phases
 wp_all <- wp |> 
   left_join(swp, by = join_by(date_col == date,
                               trt_s)) |> 
   left_join(vpd, by = join_by(date_col == date, 
                               period)) |>
-  mutate(phase = case_when(SWP_1 >= -1 ~ "Phase 1",
-                           SWP_1 < -1 ~ "Phase 2"),
+  mutate(phase = case_when(SWP_1 >= Psi_soil ~ "Phase 1",
+                           SWP_1 < Psi_soil ~ "Phase 2"),
          period2 = case_when(period == "predawn" ~ "PD",
                              period == "midday" ~ "MD") |> 
            factor(levels = c("PD", "MD")))
+
+# Make a test plot
+wp_all |> 
+  filter(trt_s == "S4") |> 
+  ggplot(aes(x = SWP_1, y = value)) +
+  geom_point(aes(color = as.factor(days_since_pulse))) +
+  facet_wrap(~phase,
+             scales = "free_x") +
+  scale_x_reverse()
 
 #### Develop models ####
 
 # Does the effect of VPD change by phase, depending on time of day?
 m1 <- lm(value ~ period2 + Dmean*phase, data = wp_all)
-summary(m1) # R2 = 0.7467
+summary(m1) # R2 = 0.6854
 # Only use significant parameters
 tm1 <- broom::tidy(m1) |>
   filter(p.value < 0.05)
@@ -68,7 +80,7 @@ pairs(EMM1, simple = "phase")
 # Does the effect of SWP change by phase, depending on time of day?
 m2 <- lm(value ~ period2 + SWP_1*phase, data = wp_all)
 summary(m2)
-# R2 = 0.7802
+# R2 = 0.7731
 
 tm2 <- broom::tidy(m2) |>
   filter(p.value < 0.05)
@@ -126,13 +138,13 @@ pval.digits <- 3
 p.val.ub <- 0.001
 
 model.fixed.effects1 <- lme4::fixef(mr1)
-fixed.effects.contrasts <- diag(length(model.fixed.effects))
-model.fixef.results1 <- data.frame(parameter = as.character(rep(NA, length(model.fixed.effects))),
-                                   estimate = as.numeric(rep(NA, length(model.fixed.effects))),
-                                   ci = as.character(rep(NA, length(model.fixed.effects))),
-                                   den.df = as.numeric(rep(NA, length(model.fixed.effects))),
-                                   tstat = as.numeric(rep(NA, length(model.fixed.effects))),
-                                   pval = as.character(rep(NA, length(model.fixed.effects))))
+fixed.effects.contrasts <- diag(length(model.fixed.effects1))
+model.fixef.results1 <- data.frame(parameter = as.character(rep(NA, length(model.fixed.effects1))),
+                                   estimate = as.numeric(rep(NA, length(model.fixed.effects1))),
+                                   ci = as.character(rep(NA, length(model.fixed.effects1))),
+                                   den.df = as.numeric(rep(NA, length(model.fixed.effects1))),
+                                   tstat = as.numeric(rep(NA, length(model.fixed.effects1))),
+                                   pval = as.character(rep(NA, length(model.fixed.effects1))))
 # Do linear hypothesis tests to isolate the effect of each parameter:
 for (r in 1:length(model.fixed.effects1)) {
   contrast.mat <- matrix(fixed.effects.contrasts[r, ], nrow = 1)
@@ -163,12 +175,12 @@ p.val.ub <- 0.001
 
 model.fixed.effects2 <- lme4::fixef(mr2)
 fixed.effects.contrasts <- diag(length(model.fixed.effects2))
-model.fixef.results2 <- data.frame(parameter = as.character(rep(NA, length(model.fixed.effects))),
-                                   estimate = as.numeric(rep(NA, length(model.fixed.effects))),
-                                   ci = as.character(rep(NA, length(model.fixed.effects))),
-                                   den.df = as.numeric(rep(NA, length(model.fixed.effects))),
-                                   tstat = as.numeric(rep(NA, length(model.fixed.effects))),
-                                   pval = as.character(rep(NA, length(model.fixed.effects))))
+model.fixef.results2 <- data.frame(parameter = as.character(rep(NA, length(model.fixed.effects2))),
+                                   estimate = as.numeric(rep(NA, length(model.fixed.effects2))),
+                                   ci = as.character(rep(NA, length(model.fixed.effects2))),
+                                   den.df = as.numeric(rep(NA, length(model.fixed.effects2))),
+                                   tstat = as.numeric(rep(NA, length(model.fixed.effects2))),
+                                   pval = as.character(rep(NA, length(model.fixed.effects2))))
 # Do linear hypothesis tests to isolate the effect of each parameter:
 for (r in 1:length(model.fixed.effects2)) {
   contrast.mat <- matrix(fixed.effects.contrasts[r, ], nrow = 1)
