@@ -2,6 +2,7 @@
 # Step 1: Read in data, filter for dups and outliers, join wide
 # Step 2: Calculate pulse stats
 # Step 3: Join together, pivot longer, output
+# Note: make sure the last day of the previous pulse does NOT get labeled day 0
 
 library(googlesheets4)
 library(tidyverse)
@@ -151,9 +152,15 @@ pulse_days <- irig_long |>
   mutate(days_since_pulse = as.numeric(date - last_event)) |> 
   left_join(pulse_num, by = join_by("date", "trt_s"))
 
+# Subset for our pulses and change final days_since_pulse to 21
+pulse_days_pulse_chase <- pulse_days |> 
+  inner_join(wp2 |> select(date_col, trt_s), join_by(date == date_col, trt_s)) |> 
+  distinct() |> 
+  mutate(days_since_pulse = if_else(date == as.Date("2023-09-04") & trt_s == "S4", 21, days_since_pulse))
+
 ##### Join with pulse stats, pivot longer, and output #####
 both_wide_pulse <- both_wide |> 
-  left_join(pulse_days, by = join_by("date_col" == "date", "trt_s"))
+  left_join(pulse_days_pulse_chase, by = join_by("date_col" == "date", "trt_s"))
 
 both_long <- both_wide_pulse |> 
   pivot_longer(cols = c("WP", "RWC"),
