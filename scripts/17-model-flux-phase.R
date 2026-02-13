@@ -28,6 +28,9 @@ vpd <- read_csv("data_clean/vpd_daily_daytime.csv") |>
   dplyr::select(-location) |> 
   rename(D_morn_mean = mean, D_morn_sd = sd)
 
+# Psi_soil threshold from fig4.R script
+Psi_soil <- -0.917
+
 # Load gs
 gst <- read_csv(file = "data_clean/gs_leaftemp.csv",
                 locale = locale(tz = "America/Phoenix")) |>
@@ -41,7 +44,7 @@ gst <- read_csv(file = "data_clean/gs_leaftemp.csv",
          swp_0_10_sd = sd) |> 
   left_join(vpd, join_by(date_col == date)) |> 
   select(-period) |> 
-  mutate(phase = if_else(swp_0_10_mean > -1, "Phase 1", "Phase 2"))
+  mutate(phase = if_else(swp_0_10_mean > Psi_soil, "Phase 1", "Phase 2"))
 
 # Load GPP
 gpp <- read_csv("data/plotgas2023.csv") |>
@@ -60,17 +63,20 @@ gpp <- read_csv("data/plotgas2023.csv") |>
          ID = Plot) |> 
   left_join(vpd, join_by(date_col == date)) |> 
   select(-period)|> 
-  mutate(phase = if_else(swp_0_10_mean > -1, "Phase 1", "Phase 2"))
+  mutate(phase = if_else(swp_0_10_mean > Psi_soil, "Phase 1", "Phase 2"))
 
 #### EDA/model for gs ####
 ggplot(gst) +
   geom_point(aes(x = swp_0_10_mean, y = gs))+
-  facet_wrap(~phase, scale = "free_x") +
+  facet_grid(col = vars(phase),
+             row = vars(trt_s), 
+             scale = "free_x") +
   scale_x_reverse(expression(paste(Psi[soil], " (MPa)")))
 
 
 # Does the effect of SWP on gs change by phase, depending on time of day?
-gs.swp.phase <- lme4::lmer(gs ~ phase + swp_0_10_mean*phase + (1|ID), data = gst)
+gs.swp.phase <- lme4::lmer(gs ~ phase + swp_0_10_mean*phase + (1|ID), data = gst |> 
+                             filter(trt_s == "S4"))
 summary(gs.swp.phase)
 vcovadj <- pbkrtest::vcovAdj(gs.swp.phase)
 alpha <- 0.05
@@ -103,7 +109,7 @@ for (r in 1:length(model.fixed.effects)) {
   model.fixef.results[r, c("estimate", "den.df", "tstat")] <- round(c(pt.est, df, t.stat), digits)
 }
 
-write_csv(model.fixef.results, "tables/fluxes/gs_SWP_phase_KR.csv")
+write_csv(model.fixef.results, "tables/fluxes/gs_SWP_phase_KR_S4.csv")
 
 # Test an additive version: two slopes and two intercepts
 param.names <- c("Phase 1:gs", "Phase 1:SWP",
@@ -133,20 +139,23 @@ for(r in 1:nrow(fixed.effects.contrasts2)) {
                                                               ifelse(round(p.val, pval.digits) == 0, p.val.ub, round(p.val, pval.digits)))
   model.fixef.results2[r, c("estimate", "den.df", "tstat")] <- round(c(pt.est, df, t.stat), digits)
 }
-write_csv(model.fixef.results2, "tables/fluxes/gs_SWP_cellmeans_KR.csv")
+write_csv(model.fixef.results2, "tables/fluxes/gs_SWP_cellmeans_KR_S4.csv")
 
-# Answer: Yes, slope of gs and SWP are significant in phase 1 
-# and slope is significantly different in phase 2
+# Answer: Yes, slope of gs and SWP are significant in phase 2 only for S4 
+
 
 #### EDA/model for ET ####
 ggplot(gpp) +
   geom_point(aes(x = swp_0_10_mean, y = ET))+
-  facet_wrap(~phase, scale = "free_x") +
+  facet_grid(col = vars(phase),
+             row = vars(trt_label), 
+             scale = "free_x") +
   scale_x_reverse(expression(paste(Psi[soil], " (MPa)")))
 
 
 # Does the effect of SWP on ET change by phase, depending on time of day?
-et.swp.phase <- lme4::lmer(ET ~ phase + swp_0_10_mean*phase + (1|ID), data = gpp)
+et.swp.phase <- lme4::lmer(ET ~ phase + swp_0_10_mean*phase + (1|ID), data = gpp |> 
+                             filter(trt_label == "P21"))
 summary(et.swp.phase)
 vcovadj <- pbkrtest::vcovAdj(et.swp.phase)
 alpha <- 0.05
@@ -179,7 +188,7 @@ for (r in 1:length(model.fixed.effects)) {
   model.fixef.results[r, c("estimate", "den.df", "tstat")] <- round(c(pt.est, df, t.stat), digits)
 }
 
-write_csv(model.fixef.results, "tables/fluxes/ET_SWP_phase_KR.csv")
+write_csv(model.fixef.results, "tables/fluxes/ET_SWP_phase_KR_S4.csv")
 
 # Test an additive version: two slopes and two intercepts
 param.names <- c("Phase 1:ET", "Phase 1:SWP",
@@ -209,21 +218,24 @@ for(r in 1:nrow(fixed.effects.contrasts2)) {
                                                              ifelse(round(p.val, pval.digits) == 0, p.val.ub, round(p.val, pval.digits)))
   model.fixef.results2[r, c("estimate", "den.df", "tstat")] <- round(c(pt.est, df, t.stat), digits)
 }
-write_csv(model.fixef.results2, "tables/fluxes/ET_SWP_cellmeans_KR.csv")
+write_csv(model.fixef.results2, "tables/fluxes/ET_SWP_cellmeans_KR_S4.csv")
 
 
-# Answer: Yes, slope of ET and SWP are significant in phase 1 
-# but not in phase 2
+# Answer: Yes, slope of ET and SWP are significant in both phases
+# Though less significantly in phase 2
 
 #### EDA/model for GPP ####
 ggplot(gpp) +
   geom_point(aes(x = swp_0_10_mean, y = GPP))+
-  facet_wrap(~phase, scale = "free_x") +
+  facet_grid(col = vars(phase),
+             row = vars(trt_label), 
+             scale = "free_x") +
   scale_x_reverse(expression(paste(Psi[soil], " (MPa)")))
 
 
 # Does the effect of SWP on GPP change by phase, depending on time of day?
-gpp.swp.phase <- lme4::lmer(GPP ~ phase + swp_0_10_mean*phase + (1|ID), data = gpp)
+gpp.swp.phase <- lme4::lmer(GPP ~ phase + swp_0_10_mean*phase + (1|ID), 
+                            data = gpp |> filter(trt_label == "P21"))
 summary(gpp.swp.phase)
 vcovadj <- pbkrtest::vcovAdj(gpp.swp.phase)
 alpha <- 0.05
@@ -256,23 +268,23 @@ for (r in 1:length(model.fixed.effects)) {
   model.fixef.results[r, c("estimate", "den.df", "tstat")] <- round(c(pt.est, df, t.stat), digits)
 }
 
-write_csv(model.fixef.results, "tables/fluxes/GPP_SWP_phase_KR.csv")
+write_csv(model.fixef.results, "tables/fluxes/GPP_SWP_phase_KR_S4.csv")
 
 # Test an additive version: two slopes and two intercepts
 param.names <- c("Phase 1:GPP", "Phase 1:SWP",
                  "Phase 2:GPP", "Phase 2:SWP")
-fixed.effects.contrasts2 <- matrix(c(1,0,0,0,
+fixed.effects.contrasts3 <- matrix(c(1,0,0,0,
                                      0,0,1,0,
                                      1,1,0,0,
                                      0,0,1,1), ncol = 4, byrow = TRUE)
-model.fixef.results2 <- data.frame(parameter = as.character(rep(NA, nrow(fixed.effects.contrasts2))),
-                                   estimate = as.numeric(rep(NA, nrow(fixed.effects.contrasts2))),
-                                   ci = as.character(rep(NA, nrow(fixed.effects.contrasts2))),
-                                   den.df = as.numeric(rep(NA, nrow(fixed.effects.contrasts2))),
-                                   tstat = as.numeric(rep(NA, nrow(fixed.effects.contrasts2))),
-                                   pval = as.character(rep(NA, nrow(fixed.effects.contrasts2))))
-for(r in 1:nrow(fixed.effects.contrasts2)) {
-  contrast.mat <- matrix(fixed.effects.contrasts2[r, ], nrow = 1)
+model.fixef.results3 <- data.frame(parameter = as.character(rep(NA, nrow(fixed.effects.contrasts3))),
+                                   estimate = as.numeric(rep(NA, nrow(fixed.effects.contrasts3))),
+                                   ci = as.character(rep(NA, nrow(fixed.effects.contrasts3))),
+                                   den.df = as.numeric(rep(NA, nrow(fixed.effects.contrasts3))),
+                                   tstat = as.numeric(rep(NA, nrow(fixed.effects.contrasts3))),
+                                   pval = as.character(rep(NA, nrow(fixed.effects.contrasts3))))
+for(r in 1:nrow(fixed.effects.contrasts3)) {
+  contrast.mat <- matrix(fixed.effects.contrasts3[r, ], nrow = 1)
   df <- pbkrtest::get_Lb_ddf(gpp.swp.phase, contrast.mat)
   pt.est <- lme4::fixef(gpp.swp.phase) %*% t(contrast.mat)
   vcov.est <- contrast.mat %*% vcovadj %*% t(contrast.mat)
@@ -280,17 +292,17 @@ for(r in 1:nrow(fixed.effects.contrasts2)) {
   t.stat <- sqrt(as.numeric(pt.est %*% solve(vcov.est) %*% t(pt.est)))
   t.stat <- ifelse(pt.est < 0, -1*t.stat, t.stat)
   p.val <- 2*pt(abs(t.stat), df, lower.tail = F)
-  model.fixef.results2[r, c("parameter", "ci", "pval")] <- c(param.names[r],
+  model.fixef.results3[r, c("parameter", "ci", "pval")] <- c(param.names[r],
                                                              paste0("(", round(pt.est - sd.est*qt(1 - alpha/2, df, lower.tail = T), digits),
                                                                     ", ", round(pt.est + sd.est*qt(1 - alpha/2, df, lower.tail = T), digits), ")"),
                                                              ifelse(round(p.val, pval.digits) == 0, p.val.ub, round(p.val, pval.digits)))
-  model.fixef.results2[r, c("estimate", "den.df", "tstat")] <- round(c(pt.est, df, t.stat), digits)
+  model.fixef.results3[r, c("estimate", "den.df", "tstat")] <- round(c(pt.est, df, t.stat), digits)
 }
-write_csv(model.fixef.results2, "tables/fluxes/GPP_SWP_cellmeans_KR.csv")
+write_csv(model.fixef.results3, "tables/fluxes/GPP_SWP_cellmeans_KR_S4.csv")
 
 
-# Answer: Yes-ish, slope of GPP and SWP are significant in phase 1 
-# but the phase 2 slope is only marginally different (p = 0.052)
+# Answer: Slope of GPP and SWP are significant in both phases
+# but in different directions
 
 # Plot above slopes with Figure 6-7
 
