@@ -1,4 +1,4 @@
-# Associate fluxes against SWP or PD and maybe VPD
+# Associate fluxes against SWP or PD and residuals against VPD
 
 library(tidyverse)
 library(cowplot)
