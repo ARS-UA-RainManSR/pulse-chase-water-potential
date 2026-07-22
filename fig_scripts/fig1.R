@@ -295,7 +295,7 @@ fig_c <- env |>
   scale_y_continuous(expression(paste(T[air], " (°C) | irrigation (mm)")),
                      sec.axis = sec_axis(~./12,
                                          "VPD (kPa)")) +
-  scale_fill_manual(values = cols_bl) +
+  scale_fill_manual(values = rev(cols_bl)) +
   labs(fill = "Treatment") +
   theme_bw(base_size = 14) +
   theme(panel.grid = element_blank(),
