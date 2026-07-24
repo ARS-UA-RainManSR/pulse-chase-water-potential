@@ -234,7 +234,8 @@ fig_a <- ggplot() +
         legend.title = element_blank(),
         legend.position = "inside",
         legend.position.inside = c(0.8, 0.75),
-        legend.background = element_blank())
+        legend.background = element_blank()) +
+  guides(color = guide_legend(override.aes = list(linetype = "blank")))
 
 #### ET ####
 # How is ET related to soil water potential during phase 2?
@@ -441,7 +442,7 @@ fig_7 <- cowplot::plot_grid(fig_a, fig_b, fig_c,
                             nrow = 3,
                             align = "hv", 
                             labels = "auto")
-fig_7
+# fig_7
 
 ggsave(filename = "fig_scripts/round2/fig7.png",
        plot = fig_7,
