@@ -1,4 +1,5 @@
-# Associate fluxes against SWP or PD and residuals against VPD
+# gs, ET, and GPP vs PD or SWP
+# faceted by treatment
 
 library(tidyverse)
 library(cowplot)
@@ -6,6 +7,7 @@ library(RColorBrewer)
 library(ggh4x)
 
 
+#### Load env and wp variables ####
 # Load SWP
 swp <- read_csv("data_clean/swp_daily_daytime.csv") |> 
   filter(period == "morn",
@@ -32,6 +34,16 @@ wp_pd <- read_csv("data_clean/wp_rwc_long.csv") |>
   filter(variable == "WP",
          period == "predawn")
 
+# wp_delta <- read_csv("data_clean/wp_rwc_long.csv") |> 
+#   select(-time_wp, -time_rwc, -cID, -notes_wp, -notes_rwc, -plant) |> 
+#   filter(variable == "WP") |> 
+#   pivot_wider(names_from = period, values_from = value) |> 
+#   mutate(delta_psi = predawn - midday)
+
+# Psi_soil threshold from fig4.R script
+Psi_soil <- -0.917
+
+#### Load fluxes, remove outliers, and calculate summaries ####
 # Load gs, rerun model, calculate resids
 gst <- read_csv(file = "data_clean/gs_leaftemp.csv",
                 locale = locale(tz = "America/Phoenix")) |>
@@ -45,14 +57,22 @@ gst <- read_csv(file = "data_clean/gs_leaftemp.csv",
          swp_0_10_sd = sd) |> 
   left_join(vpd, join_by(date_col == date)) |> 
   select(-period) |> 
-  mutate(phase = if_else(swp_0_10_mean > -1, "Phase 1", "Phase 2"))|> 
+  # Phase differentiation based on Psi_soil threshold from Fig. 4
+  mutate(phase = if_else(swp_0_10_mean > Psi_soil, "Phase 1", "Phase 2"))|>
   left_join(wp_pd, join_by(date_col, trt_s, ID)) |> 
   rename(predawn = value)
 
 # Check high leverage pd values
-outlier <- gst |> 
+outlier_phase1 <- gst |> 
   relocate(predawn, .after = gs) |> 
   filter(phase == "Phase 1") |> 
+  ungroup() |> 
+  arrange(predawn) |> 
+  slice_head(n = 1)
+
+outlier_phase2 <- gst |> 
+  relocate(predawn, .after = gs) |> 
+  filter(phase == "Phase 2") |> 
   ungroup() |> 
   arrange(predawn) |> 
   slice_head(n = 1)
@@ -60,18 +80,16 @@ outlier <- gst |>
 # High leverage point occurs on 8/26 in H1P2, S2 treatment
 # Day of minimal difference between predawn and midday (-1.84 vs. -1.91)
 # Even as mean SWP is -0.91. Already disconnected from soil?
+# Another high leverage point on 8/14, 
+# Also minimal difference between predawn and midday (-4.31 vs. -4.95)
+# And gs is somehow high. Measurement error or plant disconnected from soil?
 
 gst_remove_outlier <- gst |> 
-  anti_join(outlier)
-
-gs.pd.phase <- lme4::lmer(gs ~ phase + predawn*phase + (1|ID), data = gst_remove_outlier)
-
-gst_remove_outlier <- gst_remove_outlier |> 
-  ungroup() |> 
-  mutate(resids_gs = residuals(gs.pd.phase))
+  anti_join(outlier_phase1) |> 
+  anti_join(outlier_phase2)
 
 gst_sum <- gst_remove_outlier |>
-  group_by(trt_s, date_col) |>
+  group_by(trt_s, date_col, days_since_pulse) |>
   summarize(gs_m = mean(gs),
             gs_sd = sd(gs),
             pd_m = mean(predawn),
@@ -82,10 +100,10 @@ gst_sum <- gst_remove_outlier |>
          swp_0_10_sd = sd) |> 
   left_join(vpd, join_by(date_col == date)) |> 
   select(-period) |> 
-  mutate(phase = if_else(swp_0_10_mean > -1, "Phase 1", "Phase 2"))
+  mutate(phase = if_else(swp_0_10_mean > Psi_soil, "Phase 1", "Phase 2"))
 
 
-# Load GPP, rerun both models, calcluate resids
+# Load ecosystem fluxes, rerun both models, calculate resids
 gpp <- read_csv("data/plotgas2023.csv") |>
   mutate(date_col = lubridate::mdy(Date,
                                    tz = "America/Phoenix") |> 
@@ -102,15 +120,8 @@ gpp <- read_csv("data/plotgas2023.csv") |>
          ID = Plot) |> 
   left_join(vpd, join_by(date_col == date)) |> 
   select(-period) |> 
-  mutate(phase = if_else(swp_0_10_mean > -1, "Phase 1", "Phase 2"))
-
-et.swp.phase <- lme4::lmer(ET ~ phase + swp_0_10_mean*phase + (1|ID), data = gpp)
-gpp.swp.phase <- lme4::lmer(GPP ~ phase + swp_0_10_mean*phase + (1|ID), data = gpp)
-
-gpp <- gpp |> 
-  ungroup() |> 
-  mutate(resids_et = residuals(et.swp.phase),
-         resids_gpp = residuals(gpp.swp.phase))
+  # Phase differentiation based on Psi_soil threshold from Fig. 4
+  mutate(phase = if_else(swp_0_10_mean > Psi_soil, "Phase 1", "Phase 2"))
 
 gpp_sum <- gpp |>
   group_by(PT, date_col) |>
@@ -124,429 +135,316 @@ gpp_sum <- gpp |>
          swp_0_10_sd = sd) |> 
   left_join(vpd, join_by(date_col == date)) |> 
   select(-period) |> 
-  mutate(phase = if_else(swp_0_10_mean > -1, "Phase 1", "Phase 2"))
+  mutate(phase = if_else(swp_0_10_mean > Psi_soil, "Phase 1", "Phase 2"))
 
 
-#### New figure 7 ####
-# Each flux on its own
-# Faceted by phase, with color blocks
-# Different symbols for leaf vs. plot level
-# Accompanying residual plot with VPD, simple linear regression
-my_labeller <- as_labeller(c(gs = "g[s]~(mmol~H[2]*O~m^-2~s^-1)",
-                             et = "ET~(mmol~H[2]*O~m^-2~s^-1)",
-                             gpp = "GPP~(mu*mol~CO[2]~m^-2~s^-1)",
-                             `Phase 1` = "Phase~1",
-                             `Phase 2` = "Phase~2"),
-                           default = label_parsed)
+#### Gs ####
+# How is gs related to predawn water potential during phase 2?
+
+##### Stats #####
+# Trim dataframe to Phase 2 only
+gs_2 <- gst_remove_outlier |>
+  filter(phase == "Phase 2")
+
+# Run model with plot random effects
+# Not enough power to run  plant within plot
+rem_gs <- lme4::lmer(gs ~ predawn + (1|ID), data = gs_2)
+summary(rem_gs)
+
+# Calculate KR approximation of df 
+vcovadj <- pbkrtest::vcovAdj(rem_gs)
+alpha <- 0.05
+digits <- 3
+pval.digits <- 3
+p.val.ub <- 0.001
+
+gs_fixed_effects <- lme4::fixef(rem_gs)
+gs_contrasts <- diag(length(gs_fixed_effects)) # for each row, non-additive
+
+gs_fe_results <- data.frame(parameter = as.character(rep(NA, length(gs_fixed_effects))),
+                           estimate = as.numeric(rep(NA, length(gs_fixed_effects))),
+                           ci = as.character(rep(NA, length(gs_fixed_effects))),
+                           den.df = as.numeric(rep(NA, length(gs_fixed_effects))),
+                           tstat = as.numeric(rep(NA, length(gs_fixed_effects))),
+                           pval = as.character(rep(NA, length(gs_fixed_effects))))
+
+# Do linear hypothesis tests to isolate the effect of each parameter:
+for(r in 1:length(gs_fixed_effects)) {
+  contrast.mat <- matrix(gs_contrasts[r, ], nrow = 1)
+  df <- pbkrtest::get_Lb_ddf(rem_gs, contrast.mat)
+  pt.est <- lme4::fixef(rem_gs) %*% t(contrast.mat)
+  vcov.est <- contrast.mat %*% vcovadj %*% t(contrast.mat)
+  sd.est <- sqrt(vcov.est)
+  t.stat <- sqrt(as.numeric(pt.est %*% solve(vcov.est) %*% t(pt.est)))
+  t.stat <- ifelse(pt.est < 0, -1*t.stat, t.stat)
+  p.val <- 2*pt(abs(t.stat), df, lower.tail = F)
+  gs_fe_results[r, c("parameter", "ci", "pval")] <- c(names(gs_fixed_effects)[r],
+                                                             paste0("(", round(pt.est - sd.est*qt(1 - alpha/2, df, lower.tail = T), digits),
+                                                                    ", ", round(pt.est + sd.est*qt(1 - alpha/2, df, lower.tail = T), digits), ")"),
+                                                             ifelse(round(p.val, pval.digits) == 0, p.val.ub, round(p.val, pval.digits)))
+  gs_fe_results[r, c("estimate", "den.df", "tstat")] <- round(c(pt.est, df, t.stat), digits)
+}
+
+gs_fe_results
+
+# Predawn is significantly related to gs p < 0.001
+
+##### Plot #####
+cols_bl <- brewer.pal(9, "Blues")[c(4,7,9)]
 cols_div <- brewer.pal(7, "Spectral")
-strip <- strip_themed(background_x = elem_list_rect(fill = c(cols_div[c(6,3)])))
+strip <- strip_themed(background_x = elem_list_rect(fill = c(cols_div[c(3)])))
 
-
-#### gs ####
-
-# Switch to plotable params
-model.fixef.results2 <- read_csv("tables/fluxes/gs_PD_cellmeans_KR.csv")
-
-gs_params <- model.fixef.results2 |>
-  separate(parameter, into = c("phase", "term"), sep = ":") |>
-  # uncount(c(1,1,2,1,1,2)) |>
-  mutate(type = case_when(term == "PD" ~ "slope",
-                          .default = "intercept"),
-         sig = ifelse(pval < 0.05, TRUE, FALSE),
-         sig = ifelse(type == "slope", sig, NA)) |>
-  select(-ci, -den.df, -tstat, -pval, -term) |>
-  pivot_wider(names_from = type, 
-              values_from = c(estimate, sig)) |>
-  select(-sig_intercept) |>
-  rename(sig = sig_slope, intercept = estimate_intercept, slope = estimate_slope)
-
-cell_means <- read_csv("tables/fluxes/gsresid_VPD_cellmeans_KR.csv")
-
-gs_resid_params <- cell_means |> 
-  separate(parameter, into = c("phase", "term"), sep = ":") |>
-  # uncount(c(1,1,2,1,1,2)) |>
-  mutate(type = case_when(term == "VPD" ~ "slope",
-                          .default = "intercept"),
-         sig = ifelse(pval < 0.05, TRUE, FALSE),
-         sig = ifelse(type == "slope", sig, NA)) |>
-  select(-ci, -den.df, -tstat, -pval, -term) |>
-  pivot_wider(names_from = type, 
-              values_from = c(estimate, sig)) |>
-  select(-sig_intercept) |>
-  rename(sig = sig_slope, intercept = estimate_intercept, slope = estimate_slope)
-
-
-
-# A
-figa <- ggplot() +
-  geom_point(data = gst_remove_outlier,
+fig_a <- ggplot() +
+  geom_point(data = gst_remove_outlier |>
+               filter(phase == "Phase 2"),
              aes(x = predawn,
-                 y = gs),
-             size = 1.5,
-             alpha = 0.25) +
-  geom_errorbarh(data = gst_sum, 
-                aes(y = gs_m,
-                    xmin = pd_m - pd_sd,
-                    xmax = pd_m + pd_sd),
-                alpha = 0.5) +
-  geom_errorbar(data = gst_sum, 
-                aes(x = pd_m,
-                    ymin = gs_m - gs_sd,
-                    ymax = gs_m + gs_sd),
-                alpha = 0.5) +
-  geom_point(data = gst_sum,
-              aes(x = pd_m,
-                 y = gs_m),
+                 y = gs,
+                 col = trt_label,
+                 shape = trt_label),
+             alpha = 0.5) +
+  geom_errorbarh(data = gst_sum |> 
+                   filter(phase == "Phase 2"),
+                 aes(xmin = pd_m - pd_sd, xmax = pd_m + pd_sd, y = gs_m,
+                     color = trt_label),
+                 height = 0) +
+  geom_errorbar(data = gst_sum |> 
+                  filter(phase == "Phase 2"),
+                aes(x = pd_m, ymin = gs_m - gs_sd, ymax = gs_m + gs_sd,
+                    color = trt_label),
+                width = 0) +
+  geom_point(data = gst_sum |> 
+               filter(phase == "Phase 2"),
+             aes(x = pd_m, y = gs_m,
+                 color = trt_label,
+                 shape = trt_label),
              size = 3) +
-  geom_abline(data = gs_params,
-              aes(slope = -slope, 
-                  intercept = intercept,
-                  lty = sig)) +
-  scale_y_continuous(expression(paste(g[s], " (mmol ", H[2], "O ", m^-2, " ", s^-1, ")"))) +
-  scale_x_reverse(expression(paste(Psi[PD], " (MPa)"))) +
-  scale_linetype_manual(values = c("longdash", "solid")) +
+  geom_abline(slope = gs_fe_results[2,2],
+              intercept = gs_fe_results[1,2]) +
   facet_grid2(~phase,
               strip = strip,
               # space = "free_x",
               scales = "free_x") +
-  force_panelsizes(cols = c(1,1.75)) +
-  theme_bw(base_size = 12) +
-  theme(panel.grid = element_blank(),
-        strip.background = element_blank(),
-        legend.background = element_blank(),
-        strip.placement = "outside") +
-  guides(shape = "none",
-         lty = "none")
-
-figa
-# B
-figb <- ggplot() +
-  geom_point(data = gst_remove_outlier,
-             aes(x = D_morn_mean,
-                 y = resids_gs,
-                 color = phase),
-             size = 1.5) +
-  geom_abline(data = gs_resid_params,
-              aes(slope = slope, 
-                  intercept = intercept,
-                  color = phase,
-                  lty = sig)) +
-  scale_y_continuous(expression(paste(g[s], " resids"))) +
-  scale_x_continuous("VPD (kPa)") +
-  scale_linetype_manual(values = "longdash") +
-    scale_color_manual(values = cols_div[c(6,3)]) +
-  theme_bw(base_size = 12) +
+  scale_color_manual(values = cols_bl) +
+  scale_x_continuous(expression(paste(Psi[PD], " (MPa)"))) +
+  scale_y_continuous(expression(paste(g[s], " (mmol ", H[2], "O ", m^-2, " ", s^-1, ")"))) +
+  # scale_x_reverse() +
+  coord_trans(x = "reverse") +
+  theme_bw(base_size = 14) +
   theme(panel.grid = element_blank(),
         legend.title = element_blank(),
-        legend.background = element_blank(),
-        # legend.spacing.y = unit(0.05, "cm"),
-        legend.margin = margin(t = 0.025, unit = "cm"),
-        # legend.position.inside = c(0.5, 0.9),
-        legend.position = "top"
-        ) +
-  guides(lty = "none",
-         color = guide_legend(override.aes = list(linetype = c(0, 0)),
-                              byrow = TRUE,
-                              keywidth = 0.1,
-                              keyheight = 0.01,
-                              default.unit = "cm"))
-figb
-
-row1 <- cowplot::plot_grid(figa, figb, nrow = 1,
-                           rel_widths = c(2.25, 1),
-                           labels = c("a", "d"))
-row1
-
+        legend.position = "inside",
+        legend.position.inside = c(0.8, 0.75),
+        legend.background = element_blank())
 
 #### ET ####
+# How is ET related to soil water potential during phase 2?
 
-# Switch to plotable params
-model.fixef.results2 <- read_csv("tables/fluxes/et_SWP_cellmeans_KR.csv")
+##### Stats #####
+# Trim dataframe to Phase 2 only
+et_2 <- gpp |>
+  filter(phase == "Phase 2")
 
-et_params <- model.fixef.results2 |>
-  separate(parameter, into = c("phase", "term"), sep = ":") |>
-  # uncount(c(1,1,2,1,1,2)) |>
-  mutate(type = case_when(term == "SWP" ~ "slope",
-                          .default = "intercept"),
-         sig = ifelse(pval < 0.05, TRUE, FALSE),
-         sig = ifelse(type == "slope", sig, NA)) |>
-  select(-ci, -den.df, -tstat, -pval, -term) |>
-  pivot_wider(names_from = type, 
-              values_from = c(estimate, sig)) |>
-  select(-sig_intercept) |>
-  rename(sig = sig_slope, intercept = estimate_intercept, slope = estimate_slope)
+# Run model with plot random effects
+# Not enough power to run  plant within plot
+rem_et <- lme4::lmer(ET ~ swp_0_10_mean + (1|ID), data = et_2)
+summary(rem_et)
 
-cell_means <- read_csv("tables/fluxes/etresid_VPD_cellmeans_KR.csv")
+# Calculate KR approximation of df 
+vcovadj <- pbkrtest::vcovAdj(rem_et)
+alpha <- 0.05
+digits <- 3
+pval.digits <- 3
+p.val.ub <- 0.001
 
-et_resid_params <- cell_means |> 
-  separate(parameter, into = c("phase", "term"), sep = ":") |>
-  # uncount(c(1,1,2,1,1,2)) |>
-  mutate(type = case_when(term == "VPD" ~ "slope",
-                          .default = "intercept"),
-         sig = ifelse(pval < 0.05, TRUE, FALSE),
-         sig = ifelse(type == "slope", sig, NA)) |>
-  select(-ci, -den.df, -tstat, -pval, -term) |>
-  pivot_wider(names_from = type, 
-              values_from = c(estimate, sig)) |>
-  select(-sig_intercept) |>
-  rename(sig = sig_slope, intercept = estimate_intercept, slope = estimate_slope)
+et_fixed_effects <- lme4::fixef(rem_et)
+et_contrasts <- diag(length(et_fixed_effects)) # for each row, non-additive
 
+et_fe_results <- data.frame(parameter = as.character(rep(NA, length(et_fixed_effects))),
+                            estimate = as.numeric(rep(NA, length(et_fixed_effects))),
+                            ci = as.character(rep(NA, length(et_fixed_effects))),
+                            den.df = as.numeric(rep(NA, length(et_fixed_effects))),
+                            tstat = as.numeric(rep(NA, length(et_fixed_effects))),
+                            pval = as.character(rep(NA, length(et_fixed_effects))))
 
+# Do linear hypothesis tests to isolate the effect of each parameter:
+for(r in 1:length(et_fixed_effects)) {
+  contrast.mat <- matrix(et_contrasts[r, ], nrow = 1)
+  df <- pbkrtest::get_Lb_ddf(rem_et, contrast.mat)
+  pt.est <- lme4::fixef(rem_et) %*% t(contrast.mat)
+  vcov.est <- contrast.mat %*% vcovadj %*% t(contrast.mat)
+  sd.est <- sqrt(vcov.est)
+  t.stat <- sqrt(as.numeric(pt.est %*% solve(vcov.est) %*% t(pt.est)))
+  t.stat <- ifelse(pt.est < 0, -1*t.stat, t.stat)
+  p.val <- 2*pt(abs(t.stat), df, lower.tail = F)
+  et_fe_results[r, c("parameter", "ci", "pval")] <- c(names(et_fixed_effects)[r],
+                                                      paste0("(", round(pt.est - sd.est*qt(1 - alpha/2, df, lower.tail = T), digits),
+                                                             ", ", round(pt.est + sd.est*qt(1 - alpha/2, df, lower.tail = T), digits), ")"),
+                                                      ifelse(round(p.val, pval.digits) == 0, p.val.ub, round(p.val, pval.digits)))
+  et_fe_results[r, c("estimate", "den.df", "tstat")] <- round(c(pt.est, df, t.stat), digits)
+}
 
-# C
-figc <- ggplot() +
-  geom_point(data = gpp,
-             aes(x = swp_0_10_mean,
-                 y = ET),
-             size = 1.5,
-             alpha = 0.25) +
-  geom_errorbar(data = gpp_sum, 
-                aes(x = swp_0_10_mean,
-                    ymin = et_m - et_sd,
-                    ymax = et_m + et_sd),
-                alpha = 0.5) +
-  geom_point(data = gpp_sum,
-             aes(x = swp_0_10_mean,
-                 y = et_m),
+et_fe_results
+
+# ET is significantly related to SWP, p = 0.001
+
+##### Plot #####
+fig_b <- gpp |>
+  filter(phase == "Phase 2") |> 
+  ggplot() +
+  geom_point(aes(x = swp_0_10_mean,
+                 y = ET,
+                 col = PT,
+                 shape = PT),
+             alpha = 0.5) +
+  # geom_errorbarh(data = gpp_sum |> 
+  #                  filter(phase == "Phase 2"),
+  #                aes(xmin = swp_0_10_mean - swp_0_10_sd, 
+  #                    xmax = swp_0_10_mean + swp_0_10_sd, 
+  #                    y = et_m,
+  #                    color = PT),
+  #                height = 0) +
+  geom_errorbar(data = gpp_sum |> 
+                  filter(phase == "Phase 2"),
+                aes(x = swp_0_10_mean, 
+                    ymin = et_m - et_sd, 
+                    ymax = et_m + et_sd,
+                    color = PT),
+                width = 0) +
+  geom_point(data = gpp_sum |> 
+               filter(phase == "Phase 2"),
+             aes(x = swp_0_10_mean, y = et_m,
+                 color = PT,
+                 shape = PT),
              size = 3) +
-  geom_abline(data = et_params,
-              aes(slope = -slope, 
-                  intercept = intercept,
-                  lty = sig)) +
+  geom_abline(slope = et_fe_results[2,2],
+              intercept = et_fe_results[1,2]) +
   scale_y_continuous(expression(paste("ET (mmol ", H[2], O, " ", m^-2, s^-1, ")"))) +
-  scale_x_reverse(expression(paste(Psi[soil], " (MPa)"))) +
-  scale_linetype_manual(values = c("longdash", "solid")) +
+  scale_x_continuous(expression(paste(Psi[soil], " (MPa)"))) +
   facet_grid2(~phase,
               strip = strip,
-              space = "free_x",
+              # space = "free_x",
               scales = "free_x") +
-  force_panelsizes(cols = c(1,1.75)) +
-  theme_bw(base_size = 12) +
-  theme(panel.grid = element_blank(),
-        strip.background = element_blank(),
-        legend.background = element_blank(),
-        strip.placement = "outside") +
-  guides(shape = "none",
-         lty = "none")
-
-# D
-figd <- ggplot() +
-  geom_point(data = gpp,
-             aes(x = D_morn_mean,
-                 y = resids_et,
-                 color = phase),
-             size = 1.5) +
-  geom_abline(data = et_resid_params,
-              aes(slope = slope, 
-                  intercept = intercept,
-                  color = phase,
-                  lty = sig)) +
-  scale_y_continuous("ET resids") +
-  scale_x_continuous("VPD (kPa)") +
-  scale_linetype_manual(values = "solid") +
-  scale_color_manual(values = cols_div[c(6,3)]) +
-  theme_bw(base_size = 12) +
+  scale_color_manual(values = cols_bl) +
+  coord_trans(x = "reverse") +
+  theme_bw(base_size = 14) +
   theme(panel.grid = element_blank(),
         legend.title = element_blank(),
-        legend.background = element_blank(),
-        # legend.spacing.y = unit(0.05, "cm"),
-        legend.margin = margin(t = 0.025, unit = "cm"),
-        # legend.position.inside = c(0.5, 0.9),
-        legend.position = "top"
-  ) +
-  guides(lty = "none",
-         color = guide_legend(override.aes = list(linetype = c(0, 0)),
-                              byrow = TRUE,
-                              keywidth = 0.1,
-                              keyheight = 0.01,
-                              default.unit = "cm"))
-
-row2 <- cowplot::plot_grid(figc, figd, nrow = 1,
-                           rel_widths = c(2.25, 1),
-                           labels = c("b", "e"))
-row2
+        legend.position = "inside",
+        legend.position.inside = c(0.8, 0.8),
+        legend.background = element_blank()) +
+  guides(color = "none",
+         shape = "none")
 
 #### GPP ####
+# How is GPP related to soil water potential during phase 2?
 
-# Switch to plotable params
-model.fixef.results2 <- read_csv("tables/fluxes/gpp_SWP_cellmeans_KR.csv")
+##### Stats #####
+# Trim dataframe to Phase 2 only
+gpp_2 <- gpp |>
+  filter(phase == "Phase 2")
 
-gpp_params <- model.fixef.results2 |>
-  separate(parameter, into = c("phase", "term"), sep = ":") |>
-  # uncount(c(1,1,2,1,1,2)) |>
-  mutate(type = case_when(term == "SWP" ~ "slope",
-                          .default = "intercept"),
-         sig = ifelse(pval < 0.05, TRUE, FALSE),
-         sig = ifelse(type == "slope", sig, NA)) |>
-  select(-ci, -den.df, -tstat, -pval, -term) |>
-  pivot_wider(names_from = type, 
-              values_from = c(estimate, sig)) |>
-  select(-sig_intercept) |>
-  rename(sig = sig_slope, intercept = estimate_intercept, slope = estimate_slope)
+# Run model with plot random effects
+# Not enough power to run  plant within plot
+rem_gpp <- lme4::lmer(GPP ~ swp_0_10_mean + (1|ID), data = gpp_2)
+summary(rem_gpp)
 
-cell_means <- read_csv("tables/fluxes/gppresid_VPD_cellmeans_KR.csv")
+# Calculate KR approximation of df 
+vcovadj <- pbkrtest::vcovAdj(rem_gpp)
+alpha <- 0.05
+digits <- 3
+pval.digits <- 3
+p.val.ub <- 0.001
 
-gpp_resid_params <- cell_means |> 
-  separate(parameter, into = c("phase", "term"), sep = ":") |>
-  # uncount(c(1,1,2,1,1,2)) |>
-  mutate(type = case_when(term == "VPD" ~ "slope",
-                          .default = "intercept"),
-         sig = ifelse(pval < 0.05, TRUE, FALSE),
-         sig = ifelse(type == "slope", sig, NA)) |>
-  select(-ci, -den.df, -tstat, -pval, -term) |>
-  pivot_wider(names_from = type, 
-              values_from = c(estimate, sig)) |>
-  select(-sig_intercept) |>
-  rename(sig = sig_slope, intercept = estimate_intercept, slope = estimate_slope)
+gpp_fixed_effects <- lme4::fixef(rem_gpp)
+gpp_contrasts <- diag(length(gpp_fixed_effects)) # for each row, non-additive
 
+gpp_fe_results <- data.frame(parameter = as.character(rep(NA, length(gpp_fixed_effects))),
+                            estimate = as.numeric(rep(NA, length(gpp_fixed_effects))),
+                            ci = as.character(rep(NA, length(gpp_fixed_effects))),
+                            den.df = as.numeric(rep(NA, length(gpp_fixed_effects))),
+                            tstat = as.numeric(rep(NA, length(gpp_fixed_effects))),
+                            pval = as.character(rep(NA, length(gpp_fixed_effects))))
 
+# Do linear hypothesis tests to isolate the effect of each parameter:
+for(r in 1:length(gpp_fixed_effects)) {
+  contrast.mat <- matrix(gpp_contrasts[r, ], nrow = 1)
+  df <- pbkrtest::get_Lb_ddf(rem_gpp, contrast.mat)
+  pt.est <- lme4::fixef(rem_gpp) %*% t(contrast.mat)
+  vcov.est <- contrast.mat %*% vcovadj %*% t(contrast.mat)
+  sd.est <- sqrt(vcov.est)
+  t.stat <- sqrt(as.numeric(pt.est %*% solve(vcov.est) %*% t(pt.est)))
+  t.stat <- ifelse(pt.est < 0, -1*t.stat, t.stat)
+  p.val <- 2*pt(abs(t.stat), df, lower.tail = F)
+  gpp_fe_results[r, c("parameter", "ci", "pval")] <- c(names(gpp_fixed_effects)[r],
+                                                      paste0("(", round(pt.est - sd.est*qt(1 - alpha/2, df, lower.tail = T), digits),
+                                                             ", ", round(pt.est + sd.est*qt(1 - alpha/2, df, lower.tail = T), digits), ")"),
+                                                      ifelse(round(p.val, pval.digits) == 0, p.val.ub, round(p.val, pval.digits)))
+  gpp_fe_results[r, c("estimate", "den.df", "tstat")] <- round(c(pt.est, df, t.stat), digits)
+}
 
-# E
-fige <- ggplot() +
-  geom_point(data = gpp,
-             aes(x = swp_0_10_mean,
-                 y = GPP),
-             size = 1.5,
-             alpha = 0.25) +
-  geom_errorbar(data = gpp_sum, 
-                aes(x = swp_0_10_mean,
-                    ymin = gpp_m - gpp_sd,
-                    ymax = gpp_m + gpp_sd),
-                alpha = 0.5) +
-  geom_point(data = gpp_sum,
-             aes(x = swp_0_10_mean,
-                 y = gpp_m),
+gpp_fe_results
+
+# GPP is significantly related to SWP, p < 0.001
+
+##### Plot #####
+fig_c <- gpp |>
+  filter(phase == "Phase 2") |> 
+  ggplot() +
+  geom_point(aes(x = swp_0_10_mean,
+                 y = GPP,
+                 col = PT,
+                 shape = PT),
+             alpha = 0.5) +
+  # geom_errorbarh(data = gpp_sum |> 
+  #                  filter(phase == "Phase 2"),
+  #                aes(xmin = swp_0_10_mean - swp_0_10_sd, 
+  #                    xmax = swp_0_10_mean + swp_0_10_sd, 
+  #                    y = gpp_m,
+  #                    color = PT),
+  #                height = 0) +
+  geom_errorbar(data = gpp_sum |> 
+                  filter(phase == "Phase 2"),
+                aes(x = swp_0_10_mean, 
+                    ymin = gpp_m - gpp_sd, 
+                    ymax = gpp_m + gpp_sd,
+                    color = PT),
+                width = 0) +
+  geom_point(data = gpp_sum |> 
+               filter(phase == "Phase 2"),
+             aes(x = swp_0_10_mean, y = gpp_m,
+                 color = PT,
+                 shape = PT),
              size = 3) +
-  geom_abline(data = gpp_params,
-              aes(slope = -slope, 
-                  intercept = intercept,
-                  lty = sig)) +
+  geom_abline(slope = gpp_fe_results[2,2],
+              intercept = gpp_fe_results[1,2]) +
   scale_y_continuous(expression(paste("GPP (", mu, "mol ", CO[2], " ", m^-2, s^-1, ")"))) +
-  scale_x_reverse(expression(paste(Psi[soil], " (MPa)"))) +
-  scale_linetype_manual(values = c("longdash", "solid")) +
-  facet_wrap2(~phase,
+  scale_x_continuous(expression(paste(Psi[soil], " (MPa)"))) +
+  facet_grid2(~phase,
               strip = strip,
               # space = "free_x",
-              scales = "free_x") +  
-  force_panelsizes(cols = c(1,1.75)) +
-  theme_bw(base_size = 12) +
-  theme(panel.grid = element_blank(),
-        strip.background = element_blank(),
-        legend.background = element_blank(),
-        strip.placement = "outside") +
-  guides(shape = "none",
-         lty = "none")
-
-# F
-figf <- ggplot() +
-  geom_point(data = gpp,
-             aes(x = D_morn_mean,
-                 y = resids_gpp,
-                 color = phase),
-             size = 1.5) +
-  geom_abline(data = gpp_resid_params,
-              aes(slope = slope, 
-                  intercept = intercept,
-                  color = phase,
-                  lty = sig)) +
-  scale_y_continuous("GPP resids") +
-  scale_x_continuous("VPD (kPa)") +
-  scale_linetype_manual(values = "longdash") +
-  scale_color_manual(values = cols_div[c(6,3)]) +
-  theme_bw(base_size = 12) +
+              scales = "free_x") +
+  scale_color_manual(values = cols_bl) +
+  coord_trans(x = "reverse") +
+  theme_bw(base_size = 14) +
   theme(panel.grid = element_blank(),
         legend.title = element_blank(),
-        legend.background = element_blank(),
-        # legend.spacing.y = unit(0.05, "cm"),
-        legend.margin = margin(t = 0.025, unit = "cm"),
-        # legend.position.inside = c(0.5, 0.9),
-        legend.position = "top"
-  ) +
-  guides(lty = "none",
-         color = guide_legend(override.aes = list(linetype = c(0, 0)),
-                              byrow = TRUE,
-                              keywidth = 0.1,
-                              keyheight = 0.01,
-                              default.unit = "cm"))
-
-row3 <- cowplot::plot_grid(fige, figf, nrow = 1,
-                           rel_widths = c(2.25, 1),
-                           labels = c("c", "f"))
-row3
-
+        legend.position = "inside",
+        legend.position.inside = c(0.8, 0.8),
+        legend.background = element_blank()) +
+  guides(color = "none",
+         shape = "none")
 
 #### Assemble panels for fig 7 ####
 
 
-fig_7 <- cowplot::plot_grid(figa, figb, 
-                            figc, figd, 
-                            fige, figf,
+fig_7 <- cowplot::plot_grid(fig_a, fig_b, fig_c, 
                             nrow = 3,
-                            align = "hv", axis = "lb",
-                            rel_widths = c(2.25, 1),
-                            labels = c("a", "d", "b", "e", "c", "f"))
+                            align = "hv", 
+                            labels = "auto")
 fig_7
 
 ggsave(filename = "fig_scripts/round2/fig7.png",
        plot = fig_7,
-       height = 7,
-       width = 8,
-       units = "in")
-
-##### Alternative residual plot for GPP ####
-
-#Load par resids
-cell_means <- read_csv("tables/fluxes/gppresid_PAR_cellmeans_KR.csv")
-
-gpp_resid_params <- cell_means |> 
-  separate(parameter, into = c("phase", "term"), sep = ":") |>
-  # uncount(c(1,1,2,1,1,2)) |>
-  mutate(type = case_when(term == "PAR" ~ "slope",
-                          .default = "intercept"),
-         sig = ifelse(pval < 0.05, TRUE, FALSE),
-         sig = ifelse(type == "slope", sig, NA)) |>
-  select(-ci, -den.df, -tstat, -pval, -term) |>
-  pivot_wider(names_from = type, 
-              values_from = c(estimate, sig)) |>
-  select(-sig_intercept) |>
-  rename(sig = sig_slope, intercept = estimate_intercept, slope = estimate_slope)
-
-
-# G
-figg <- ggplot() +
-  geom_point(data = gpp,
-             aes(x = Par,
-                 y = resids_gpp,
-                 color = phase),
-             size = 1.5) +
-  geom_abline(data = gpp_resid_params,
-              aes(slope = slope, 
-                  intercept = intercept,
-                  color = phase,
-                  lty = sig)) +
-  scale_y_continuous("GPP resids") +
-  scale_x_continuous(expression(paste("PAR (", mu, "mol ", " ", m^-2, s^-1, ")"))) +
-  scale_linetype_manual(values = "longdash") +
-  scale_color_manual(values = cols_div[c(6,3)]) +
-  theme_bw(base_size = 10) +
-  theme(panel.grid = element_blank(),
-        legend.title = element_blank(),
-        legend.background = element_blank(),
-        # legend.spacing.y = unit(0.05, "cm"),
-        legend.margin = margin(t = 0.025, unit = "cm"),
-        # legend.position.inside = c(0.5, 0.9),
-        legend.position = "top"
-  ) +
-  guides(lty = "none",
-         color = guide_legend(override.aes = list(linetype = c(0, 0)),
-                              byrow = TRUE,
-                              keywidth = 0.1,
-                              keyheight = 0.01,
-                              default.unit = "cm"))
-
-
-ggsave(filename = "fig_scripts/round2/figS_.png",
-       plot = figg,
-       height = 3,
-       width = 3,
+       height = 8,
+       width = 4,
        units = "in")
